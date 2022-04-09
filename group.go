@@ -7,6 +7,7 @@ import (
 type Group struct {
 	basePath string
 	route    Router
+	handlers []HandlerFunc
 }
 
 func (g *Group) Group(relativePath string, handlers ...HandlerFunc) *Group {
@@ -49,6 +50,10 @@ func (g *Group) Any(relativePath string, handlers ...HandlerFunc) Router {
 		g.Handle(method, relativePath, handlers...)
 	}
 	return g.route
+}
+
+func (g *Group) Use(middlewares ...HandlerFunc) {
+	g.handlers = append(g.handlers, middlewares...)
 }
 
 func (g *Group) Handle(method string, relativePath string, handlers ...HandlerFunc) Router {

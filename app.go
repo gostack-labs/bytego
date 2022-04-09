@@ -23,40 +23,9 @@ func New() *App {
 
 type HandlerFunc func(*Ctx)
 
-// func (a *App) GET(path string, handler HandlerFunc) Router {
-// 	return a.route.GET(path, handler)
-// }
-
-// func (a *App) POST(path string, handler HandlerFunc) Router {
-// 	return a.route.POST(path, handler)
-// }
-
-// func (a *App) PUT(path string, handler HandlerFunc) Router {
-// 	return a.route.PUT(path, handler)
-// }
-
-// func (a *App) DELETE(path string, handler HandlerFunc) Router {
-// 	return a.route.DELETE(path, handler)
-// }
-
-// func (a *App) HEAD(path string, handler HandlerFunc) Router {
-// 	return a.route.HEAD(path, handler)
-// }
-// func (a *App) PATCH(path string, handler HandlerFunc) Router {
-// 	return a.route.PATCH(path, handler)
-// }
-
-// func (a *App) OPTIONS(path string, handler HandlerFunc) Router {
-// 	return a.route.OPTIONS(path, handler)
-// }
-
-// func (a *App) Any(path string, handler HandlerFunc) Router {
-// 	return a.route.Any(path, handler)
-// }
-
-// func (a *App) Group(relativePath string, handlers ...HandlerFunc) *Group {
-// 	return a.route.Group(relativePath, handlers...)
-// }
+func (a *App) Use(middlewares ...HandlerFunc) {
+	a.Router.Use(middlewares...)
+}
 
 func (a *App) Handler() http.Handler {
 	if !a.UseHTTP2 {

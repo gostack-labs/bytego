@@ -24,6 +24,7 @@ type Router interface {
 	Handle(method string, path string, handlers ...HandlerFunc) Router
 	Any(path string, handlers ...HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
+	Use(middlewares ...HandlerFunc)
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
@@ -43,6 +44,7 @@ type route struct {
 	trees      map[string]*node
 	maxParams  uint16
 	pool       sync.Pool
+	handlers   []HandlerFunc
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -113,7 +115,12 @@ func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
 	return &Group{
 		basePath: joinPath(r.basePath, relativePath),
 		route:    r,
+		handlers: combineHandlers(r.handlers, handlers),
 	}
+}
+
+func (r *route) Use(middlewares ...HandlerFunc) {
+	r.handlers = append(r.handlers, middlewares...)
 }
 
 func (r *route) add(method, path string, handlers ...HandlerFunc) Router {
@@ -139,7 +146,7 @@ func (r *route) add(method, path string, handlers ...HandlerFunc) Router {
 		r.trees[method] = root
 	}
 
-	root.addRoute(path, handlers...)
+	root.addRoute(path, combineHandlers(r.handlers, handlers)...)
 
 	// Update maxParams
 	if paramsCount := countParams(path); paramsCount+varsCount > r.maxParams {
@@ -161,8 +168,17 @@ func (r *route) getParams() *Params {
 	*ps = (*ps)[0:0] // reset slice
 	return ps
 }
+
 func (r *route) putParams(ps *Params) {
 	if ps != nil {
 		r.paramsPool.Put(ps)
 	}
+}
+
+func combineHandlers(handlers1, handlers2 []HandlerFunc) []HandlerFunc {
+	size := len(handlers1) + len(handlers2)
+	mergedHandlers := make([]HandlerFunc, size)
+	copy(mergedHandlers, handlers1)
+	copy(mergedHandlers[len(handlers1):], handlers2)
+	return mergedHandlers
 }
