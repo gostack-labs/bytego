@@ -1,37 +1,50 @@
 package bytego
 
+import (
+	"net/http"
+)
+
 type Group struct {
 	basePath string
-	router   Router
+	route    Router
 }
 
 func (g *Group) Group(relativePath string, handlers ...HandlerFunc) *Group {
 	return &Group{
-		basePath: g.basePath + relativePath,
-		router:   g.router,
+		basePath: joinPath(g.basePath, relativePath),
+		route:    g.route,
 	}
 }
 
-func (g *Group) Get(relativePath string, handler HandlerFunc) Router {
-	return g.router.Get(g.basePath+relativePath, handler)
+func (g *Group) GET(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodGet, relativePath, handler)
 }
 
-func (g *Group) Post(relativePath string, handler HandlerFunc) Router {
-	return g.router.Post(g.basePath+relativePath, handler)
+func (g *Group) POST(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodPost, relativePath, handler)
 }
 
-func (g *Group) Put(relativePath string, handler HandlerFunc) Router {
-	return g.router.Put(g.basePath+relativePath, handler)
+func (g *Group) PUT(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodPut, relativePath, handler)
 }
 
-func (g *Group) Delete(relativePath string, handler HandlerFunc) Router {
-	return g.router.Delete(g.basePath+relativePath, handler)
+func (g *Group) DELETE(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodDelete, relativePath, handler)
 }
 
-func (g *Group) Head(relativePath string, handler HandlerFunc) Router {
-	return g.router.Head(g.basePath+relativePath, handler)
+func (g *Group) HEAD(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodHead, relativePath, handler)
 }
 
-func (g *Group) Options(relativePath string, handler HandlerFunc) Router {
-	return g.router.Options(g.basePath+relativePath, handler)
+func (g *Group) PATCH(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodPatch, relativePath, handler)
+}
+
+func (g *Group) OPTIONS(relativePath string, handler HandlerFunc) Router {
+	return g.Handle(http.MethodOptions, relativePath, handler)
+}
+
+func (g *Group) Handle(method string, relativePath string, handler HandlerFunc) Router {
+	path := joinPath(g.basePath, relativePath)
+	return g.route.Handle(method, path, handler)
 }

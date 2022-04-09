@@ -1,27 +1,34 @@
 package main
 
-import "github.com/gostack-labs/bytego"
+import (
+	"log"
+
+	"github.com/gostack-labs/bytego"
+)
 
 func main() {
 	app := bytego.New()
-	app.Get("/", func(c *bytego.Ctx) {
+	app.GET("/", func(c *bytego.Ctx) {
 		c.String(200, "hello, world!")
 	})
-	app.Get("/a", func(c *bytego.Ctx) {
+	app.GET("/a", func(c *bytego.Ctx) {
 		c.String(200, "this is a page!")
 	})
-	app.Get("/json", func(c *bytego.Ctx) {
+	app.GET("/json", func(c *bytego.Ctx) {
 		c.JSON(200, map[string]string{
 			"a": "b",
 			"c": "d",
 		})
 	})
-	app.Post("/abc", func(c *bytego.Ctx) {
+	app.POST("/abc", func(c *bytego.Ctx) {
 		c.String(200, "sss")
 	})
 	g := app.Group("/group")
-	g.Get("/hello", func(c *bytego.Ctx) {
+	g.GET("/hello", func(c *bytego.Ctx) {
 		c.String(200, "hello, group!")
 	})
-	app.Run(":8080")
+
+	if err := app.Run(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }

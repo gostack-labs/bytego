@@ -6,12 +6,14 @@ import (
 )
 
 type Router interface {
-	Get(path string, handler HandlerFunc) Router
-	Post(path string, handler HandlerFunc) Router
-	Put(path string, handler HandlerFunc) Router
-	Delete(path string, handler HandlerFunc) Router
-	Head(path string, handler HandlerFunc) Router
-	Options(path string, handler HandlerFunc) Router
+	GET(path string, handler HandlerFunc) Router
+	POST(path string, handler HandlerFunc) Router
+	PUT(path string, handler HandlerFunc) Router
+	DELETE(path string, handler HandlerFunc) Router
+	HEAD(path string, handler HandlerFunc) Router
+	PATCH(path string, handler HandlerFunc) Router
+	OPTIONS(path string, handler HandlerFunc) Router
+	Handle(method string, path string, handler HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
@@ -49,34 +51,41 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	http.NotFound(w, req)
 }
 
-func (r *route) Get(path string, handler HandlerFunc) Router {
+func (r *route) GET(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodGet, path, handler)
 }
 
-func (r *route) Post(path string, handler HandlerFunc) Router {
+func (r *route) POST(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodPost, path, handler)
 }
 
-func (r *route) Put(path string, handler HandlerFunc) Router {
+func (r *route) PUT(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodPut, path, handler)
 }
 
-func (r *route) Delete(path string, handler HandlerFunc) Router {
+func (r *route) DELETE(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodDelete, path, handler)
 }
 
-func (r *route) Head(path string, handler HandlerFunc) Router {
+func (r *route) HEAD(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodHead, path, handler)
 }
 
-func (r *route) Options(path string, handler HandlerFunc) Router {
+func (r *route) PATCH(path string, handler HandlerFunc) Router {
+	return r.add(http.MethodPatch, path, handler)
+}
+
+func (r *route) OPTIONS(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodOptions, path, handler)
+}
+func (r *route) Handle(method string, path string, handler HandlerFunc) Router {
+	return r.add(method, path, handler)
 }
 
 func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
 	return &Group{
-		basePath: r.basePath + relativePath,
-		router:   r,
+		basePath: joinPath(r.basePath, relativePath),
+		route:    r,
 	}
 }
 
