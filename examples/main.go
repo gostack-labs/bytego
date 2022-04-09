@@ -35,6 +35,16 @@ func main() {
 	app.GET("/a", func(c *bytego.Ctx) {
 		c.String(200, "this is a page!")
 	})
+
+	app.GET("/user", func(c *bytego.Ctx) {
+		c.String(200, c.Query("id"))
+	})
+	app.GET("/user/:id", func(c *bytego.Ctx) {
+		c.String(200, c.Param("id"))
+	})
+	app.POST("/user/update", func(c *bytego.Ctx) {
+		c.String(200, c.Form("new_name"))
+	})
 	app.GET("/error", func(c *bytego.Ctx) {
 		panic("this a error")
 	})
@@ -44,9 +54,7 @@ func main() {
 			"c": "d",
 		})
 	})
-	app.POST("/abc", func(c *bytego.Ctx) {
-		c.String(200, "sss")
-	})
+
 	app.Any("/any", func(c *bytego.Ctx) {
 		c.String(200, "this is any router")
 	})

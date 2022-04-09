@@ -12,6 +12,7 @@ type Ctx struct {
 	Method   string
 	Writer   http.ResponseWriter
 	Request  *http.Request
+	Params   Params
 }
 
 func (c *Ctx) reset() {
@@ -21,9 +22,23 @@ func (c *Ctx) reset() {
 	c.Request = nil
 }
 
+func (c *Ctx) Param(key string) string {
+	param, _ := c.Params.Get(key)
+	return param
+}
+
+func (c *Ctx) Query(key string) string {
+	return c.Request.URL.Query().Get(key)
+}
+
+func (c *Ctx) Form(key string) string {
+	return c.Request.FormValue(key)
+}
+
 func (c *Ctx) Status(code int) {
 	c.Writer.WriteHeader(code)
 }
+
 func (c *Ctx) String(code int, s string) {
 	c.Status(code)
 	_, _ = c.Writer.Write([]byte(s))

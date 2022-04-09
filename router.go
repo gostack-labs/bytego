@@ -59,6 +59,7 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			ctx.handlers = handlers
 
 			if ps != nil {
+				ctx.Params = *ps
 				ctx.Next()
 				r.putParams(ps)
 			} else {

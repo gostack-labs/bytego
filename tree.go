@@ -13,6 +13,15 @@ type Param struct {
 
 type Params []Param
 
+func (ps Params) Get(name string) (string, bool) {
+	for _, p := range ps {
+		if p.Key == name {
+			return p.Value, true
+		}
+	}
+	return "", false
+}
+
 func min(a, b int) int {
 	if a <= b {
 		return a
