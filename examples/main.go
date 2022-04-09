@@ -27,7 +27,17 @@ func main() {
 		c.String(200, "this is any router")
 	})
 	g := app.Group("/group")
-	g.GET("/hello", func(c *bytego.Ctx) {
+	middleware := func(c *bytego.Ctx) {
+		log.Println("middleware call")
+		if true {
+			// c.Next()
+			// c.AbortWithStatus(500)
+			c.String(200, "abort")
+			c.Abort()
+		}
+	}
+	g.GET("/hello", middleware, func(c *bytego.Ctx) {
+		log.Println("router call")
 		c.String(200, "hello, group!")
 	})
 	g.GET("/any", func(c *bytego.Ctx) {

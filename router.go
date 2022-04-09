@@ -14,21 +14,27 @@ var (
 )
 
 type Router interface {
-	GET(path string, handler HandlerFunc) Router
-	POST(path string, handler HandlerFunc) Router
-	PUT(path string, handler HandlerFunc) Router
-	DELETE(path string, handler HandlerFunc) Router
-	HEAD(path string, handler HandlerFunc) Router
-	PATCH(path string, handler HandlerFunc) Router
-	OPTIONS(path string, handler HandlerFunc) Router
-	Handle(method string, path string, handler HandlerFunc) Router
-	Any(path string, handler HandlerFunc) Router
+	GET(path string, handlers ...HandlerFunc) Router
+	POST(path string, handlers ...HandlerFunc) Router
+	PUT(path string, handlers ...HandlerFunc) Router
+	DELETE(path string, handlers ...HandlerFunc) Router
+	HEAD(path string, handlers ...HandlerFunc) Router
+	PATCH(path string, handlers ...HandlerFunc) Router
+	OPTIONS(path string, handlers ...HandlerFunc) Router
+	Handle(method string, path string, handlers ...HandlerFunc) Router
+	Any(path string, handlers ...HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
 func newRouter() Router {
-	return &route{}
+	route := &route{
+		basePath: "/",
+	}
+	route.pool.New = func() interface{} {
+		return &Ctx{}
+	}
+	return route
 }
 
 type route struct {
@@ -36,23 +42,27 @@ type route struct {
 	paramsPool sync.Pool
 	trees      map[string]*node
 	maxParams  uint16
+	pool       sync.Pool
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	if root := r.trees[req.Method]; root != nil {
-		if handle, ps, _ := root.getValue(path, r.getParams); handle != nil {
-			ctx := &Ctx{
-				path:    path,
-				Request: req,
-				Writer:  w,
-			}
+		if handlers, ps, _ := root.getValue(path, r.getParams); handlers != nil {
+			ctx := r.pool.Get().(*Ctx)
+			ctx.reset()
+			ctx.path = path
+			ctx.Request = req
+			ctx.Writer = w
+			ctx.handlers = handlers
+
 			if ps != nil {
-				handle(ctx)
+				ctx.Next()
 				r.putParams(ps)
 			} else {
-				handle(ctx)
+				ctx.Next()
 			}
+			r.pool.Put(ctx)
 			return
 		}
 	}
@@ -60,43 +70,43 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	http.NotFound(w, req)
 }
 
-func (r *route) GET(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodGet, path, handler)
+func (r *route) GET(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodGet, path, handlers...)
 }
 
-func (r *route) POST(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodPost, path, handler)
+func (r *route) POST(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodPost, path, handlers...)
 }
 
-func (r *route) PUT(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodPut, path, handler)
+func (r *route) PUT(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodPut, path, handlers...)
 }
 
-func (r *route) DELETE(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodDelete, path, handler)
+func (r *route) DELETE(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodDelete, path, handlers...)
 }
 
-func (r *route) HEAD(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodHead, path, handler)
+func (r *route) HEAD(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodHead, path, handlers...)
 }
 
-func (r *route) PATCH(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodPatch, path, handler)
+func (r *route) PATCH(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodPatch, path, handlers...)
 }
 
-func (r *route) OPTIONS(path string, handler HandlerFunc) Router {
-	return r.add(http.MethodOptions, path, handler)
+func (r *route) OPTIONS(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodOptions, path, handlers...)
 }
 
-func (r *route) Any(path string, handler HandlerFunc) Router {
+func (r *route) Any(path string, handlers ...HandlerFunc) Router {
 	for _, method := range anyMethods {
-		r.add(method, path, handler)
+		r.add(method, path, handlers...)
 	}
 	return r
 }
 
-func (r *route) Handle(method string, path string, handler HandlerFunc) Router {
-	return r.add(method, path, handler)
+func (r *route) Handle(method string, path string, handlers ...HandlerFunc) Router {
+	return r.add(method, path, handlers...)
 }
 
 func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
@@ -106,7 +116,7 @@ func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
 	}
 }
 
-func (r *route) add(method, path string, handler HandlerFunc) Router {
+func (r *route) add(method, path string, handlers ...HandlerFunc) Router {
 	varsCount := uint16(0)
 
 	if method == "" {
@@ -115,7 +125,7 @@ func (r *route) add(method, path string, handler HandlerFunc) Router {
 	if len(path) < 1 || path[0] != '/' {
 		panic("path must begin with '/' in path '" + path + "'")
 	}
-	if handler == nil {
+	if handlers == nil {
 		panic("handle must not be nil")
 	}
 
@@ -129,7 +139,7 @@ func (r *route) add(method, path string, handler HandlerFunc) Router {
 		r.trees[method] = root
 	}
 
-	root.addRoute(path, handler)
+	root.addRoute(path, handlers...)
 
 	// Update maxParams
 	if paramsCount := countParams(path); paramsCount+varsCount > r.maxParams {
