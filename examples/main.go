@@ -23,9 +23,15 @@ func main() {
 	app.POST("/abc", func(c *bytego.Ctx) {
 		c.String(200, "sss")
 	})
+	app.Any("/any", func(c *bytego.Ctx) {
+		c.String(200, "this is any router")
+	})
 	g := app.Group("/group")
 	g.GET("/hello", func(c *bytego.Ctx) {
 		c.String(200, "hello, group!")
+	})
+	g.GET("/any", func(c *bytego.Ctx) {
+		c.String(200, "hello, group any!")
 	})
 
 	if err := app.Run(":8080"); err != nil {

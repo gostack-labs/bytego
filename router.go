@@ -5,6 +5,14 @@ import (
 	"sync"
 )
 
+var (
+	anyMethods = []string{
+		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect,
+		http.MethodTrace,
+	}
+)
+
 type Router interface {
 	GET(path string, handler HandlerFunc) Router
 	POST(path string, handler HandlerFunc) Router
@@ -14,6 +22,7 @@ type Router interface {
 	PATCH(path string, handler HandlerFunc) Router
 	OPTIONS(path string, handler HandlerFunc) Router
 	Handle(method string, path string, handler HandlerFunc) Router
+	Any(path string, handler HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
@@ -78,6 +87,14 @@ func (r *route) PATCH(path string, handler HandlerFunc) Router {
 func (r *route) OPTIONS(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodOptions, path, handler)
 }
+
+func (r *route) Any(path string, handler HandlerFunc) Router {
+	for _, method := range anyMethods {
+		r.add(method, path, handler)
+	}
+	return r
+}
+
 func (r *route) Handle(method string, path string, handler HandlerFunc) Router {
 	return r.add(method, path, handler)
 }

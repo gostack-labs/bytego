@@ -46,8 +46,13 @@ func (a *App) HEAD(path string, handler HandlerFunc) Router {
 func (a *App) PATCH(path string, handler HandlerFunc) Router {
 	return a.route.PATCH(path, handler)
 }
+
 func (a *App) OPTIONS(path string, handler HandlerFunc) Router {
 	return a.route.OPTIONS(path, handler)
+}
+
+func (a *App) Any(path string, handler HandlerFunc) Router {
+	return a.route.Any(path, handler)
 }
 
 func (a *App) Group(relativePath string, handlers ...HandlerFunc) *Group {

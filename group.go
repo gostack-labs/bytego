@@ -44,6 +44,13 @@ func (g *Group) OPTIONS(relativePath string, handler HandlerFunc) Router {
 	return g.Handle(http.MethodOptions, relativePath, handler)
 }
 
+func (g *Group) Any(relativePath string, handler HandlerFunc) Router {
+	for _, method := range anyMethods {
+		g.Handle(method, relativePath, handler)
+	}
+	return g.route
+}
+
 func (g *Group) Handle(method string, relativePath string, handler HandlerFunc) Router {
 	path := joinPath(g.basePath, relativePath)
 	return g.route.Handle(method, path, handler)
