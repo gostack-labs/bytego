@@ -12,6 +12,7 @@ type Router interface {
 	Delete(path string, handler HandlerFunc) Router
 	Head(path string, handler HandlerFunc) Router
 	Options(path string, handler HandlerFunc) Router
+	Group(relativePath string, handlers ...HandlerFunc) *Group
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
@@ -70,6 +71,13 @@ func (r *route) Head(path string, handler HandlerFunc) Router {
 
 func (r *route) Options(path string, handler HandlerFunc) Router {
 	return r.add(http.MethodOptions, path, handler)
+}
+
+func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
+	return &Group{
+		basePath: r.basePath + relativePath,
+		router:   r,
+	}
 }
 
 func (r *route) add(method, path string, handler HandlerFunc) Router {

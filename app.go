@@ -55,6 +55,10 @@ func (a *App) Options(path string, handler HandlerFunc) Router {
 	return a.route.Options(path, handler)
 }
 
+func (a *App) Group(relativePath string, handlers ...HandlerFunc) *Group {
+	return a.route.Group(relativePath, handlers...)
+}
+
 func (a *App) Handler() http.Handler {
 	if !a.UseHTTP2 {
 		return a.route
