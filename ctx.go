@@ -2,6 +2,7 @@ package bytego
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ type Ctx struct {
 	Params     Params
 	sameSite   http.SameSite
 	routerPath string
+	isDebug    bool
 }
 
 func (c *Ctx) reset() {
@@ -49,52 +51,71 @@ func (c *Ctx) RouterPath() string {
 	return c.routerPath
 }
 
-func (c *Ctx) String(code int, s string) {
+func (c *Ctx) String(code int, s string) error {
 	c.Status(code)
-	_, _ = c.Writer.Write([]byte(s))
+	_, err := c.Writer.Write([]byte(s))
+	return err
 }
 
-func (c *Ctx) JSON(code int, i interface{}) {
-	// c.Status(code)
-	if err := c.writeJSON(i); err != nil {
-		panic(err)
+func (c *Ctx) JSON(code int, i interface{}) error {
+	c.Status(code)
+	bs, err := json.Marshal(i)
+	if err != nil {
+		return err
 	}
+	c.writeContentType(c.Writer, "application/json; charset=utf-8")
+	_, err = c.Writer.Write(bs)
+	return err
 }
 
-func (c *Ctx) JSONP(code int, i interface{}) {
+func (c *Ctx) JSONP(code int, i interface{}) error {
 	callback := c.Query("callback")
 	if callback == "" {
-		c.JSON(code, i)
-		return
+		return c.JSON(code, i)
 	}
 	b, err := json.Marshal(i)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	_, err = c.Writer.Write(stringToBytes(callback))
-	if err != nil {
-		panic(err)
+	if _, err = c.Writer.Write(stringToBytes(callback)); err != nil {
+		return err
 	}
-	_, err = c.Writer.Write([]byte{'('})
-	if err != nil {
-		panic(err)
+	if _, err = c.Writer.Write([]byte{'('}); err != nil {
+		return err
 	}
-	_, err = c.Writer.Write(b)
-	if err != nil {
-		panic(err)
+	if _, err = c.Writer.Write(b); err != nil {
+		return err
 	}
-	_, err = c.Writer.Write([]byte{')', ';'})
-	if err != nil {
-		panic(err)
+	if _, err = c.Writer.Write([]byte{')', ';'}); err != nil {
+		return err
 	}
+	return err
 }
 
-func (c *Ctx) Next() {
+func (c *Ctx) XML(code int, i interface{}) error {
+	bs, err := xml.Marshal(i)
+	if err != nil {
+		return err
+	}
+	_, err = c.Writer.Write(bs)
+	return err
+}
+
+func (c *Ctx) EmptyContent(code int) error {
+	c.Status(code)
+	return nil
+}
+
+func (c *Ctx) Next() error {
 	c.index++
 	for c.index < len(c.handlers) {
-		c.handlers[c.index](c)
+		err := c.handlers[c.index](c)
 		c.index++
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c *Ctx) Abort() {
@@ -143,14 +164,8 @@ func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, sec
 	})
 }
 
-func (c *Ctx) writeJSON(i interface{}) error {
-	bs, err := json.Marshal(i)
-	if err != nil {
-		return err
-	}
-	c.writeContentType(c.Writer, "application/json; charset=utf-8")
-	_, err = c.Writer.Write(bs)
-	return err
+func (c *Ctx) IsDebug() bool {
+	return c.isDebug
 }
 
 func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {

@@ -28,23 +28,26 @@ type Router interface {
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
-func newRouter() Router {
-	route := &route{
-		basePath: "/",
+func newRouter() *route {
+	r := &route{
+		basePath:     "/",
+		errorHandler: defaultErrorHandler,
 	}
-	route.pool.New = func() interface{} {
+	r.pool.New = func() interface{} {
 		return &Ctx{}
 	}
-	return route
+	return r
 }
 
 type route struct {
-	basePath   string
-	paramsPool sync.Pool
-	trees      map[string]*node
-	maxParams  uint16
-	pool       sync.Pool
-	handlers   []HandlerFunc
+	basePath     string
+	paramsPool   sync.Pool
+	trees        map[string]*node
+	maxParams    uint16
+	pool         sync.Pool
+	handlers     []HandlerFunc
+	errorHandler ErrorHandler
+	isDebug      bool
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -58,13 +61,18 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			ctx.Writer = w
 			ctx.handlers = value.handlers
 			ctx.routerPath = value.fullPath
+			ctx.isDebug = r.isDebug
 
+			var err error
 			if value.params != nil {
 				ctx.Params = *value.params
-				ctx.Next()
+				err = ctx.Next()
 				r.putParams(value.params)
 			} else {
-				ctx.Next()
+				err = ctx.Next()
+			}
+			if err != nil {
+				r.errorHandler(err, ctx)
 			}
 			r.pool.Put(ctx)
 			return
