@@ -22,6 +22,11 @@ type Ctx struct {
 	isDebug    bool
 }
 
+const (
+	jsonContentType = "application/json; charset=utf-8"
+	xmlContentType  = "application/xml; charset=utf-8"
+)
+
 func (c *Ctx) reset() {
 	c.index = -1
 	c.handlers = nil
@@ -63,7 +68,7 @@ func (c *Ctx) JSON(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Writer, "application/json; charset=utf-8")
+	c.writeContentType(c.Writer, jsonContentType)
 	_, err = c.Writer.Write(bs)
 	return err
 }
@@ -77,6 +82,7 @@ func (c *Ctx) JSONP(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
+	c.writeContentType(c.Writer, jsonContentType)
 	if _, err = c.Writer.Write(stringToBytes(callback)); err != nil {
 		return err
 	}
@@ -97,6 +103,7 @@ func (c *Ctx) XML(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
+	c.writeContentType(c.Writer, xmlContentType)
 	_, err = c.Writer.Write(bs)
 	return err
 }
@@ -121,6 +128,7 @@ func (c *Ctx) Next() error {
 func (c *Ctx) Abort() {
 	c.index = len(c.handlers) + 1
 }
+
 func (c *Ctx) AbortWithStatus(code int) {
 	c.Status(code)
 	c.Abort()

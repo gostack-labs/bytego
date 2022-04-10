@@ -88,6 +88,13 @@ func main() {
 			"c": "d",
 		})
 	})
+	app.GET("/xml", func(c *bytego.Ctx) error {
+		type student struct {
+			Name string `xml:"name,omitempty"`
+			Age  int    `xml:"age,omitempty"`
+		}
+		return c.XML(200, &student{Name: "hao", Age: 18})
+	})
 	app.GET("/jsonp", func(c *bytego.Ctx) error {
 		return c.JSONP(200, map[string]string{
 			"a": "b",
