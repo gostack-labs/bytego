@@ -1,6 +1,9 @@
 package bytego
 
-import "path"
+import (
+	"path"
+	"unsafe"
+)
 
 func joinPath(basePath, relativePath string) string {
 	if relativePath == "" {
@@ -15,4 +18,9 @@ func joinPath(basePath, relativePath string) string {
 
 func endWithChar(str string, c byte) bool {
 	return str[len(str)-1] == c
+}
+
+// stringToBytes converts string to byte slice without a memory allocation.
+func stringToBytes(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&s))
 }

@@ -40,7 +40,7 @@ func main() {
 		c.String(200, c.Query("id"))
 	})
 	app.GET("/user/:id", func(c *bytego.Ctx) {
-		c.String(200, c.Param("id"))
+		c.String(200, c.Param("id")+c.RouterPath())
 	})
 	app.POST("/user/update", func(c *bytego.Ctx) {
 		c.String(200, c.Form("new_name"))
@@ -50,6 +50,12 @@ func main() {
 	})
 	app.GET("/json", func(c *bytego.Ctx) {
 		c.JSON(200, map[string]string{
+			"a": "b",
+			"c": "d",
+		})
+	})
+	app.GET("/jsonp", func(c *bytego.Ctx) {
+		c.JSONP(200, map[string]string{
 			"a": "b",
 			"c": "d",
 		})

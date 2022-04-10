@@ -50,18 +50,19 @@ type route struct {
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	if root := r.trees[req.Method]; root != nil {
-		if handlers, ps, _ := root.getValue(path, r.getParams); handlers != nil {
+		if value := root.getValue(path, r.getParams); value.handlers != nil {
 			ctx := r.pool.Get().(*Ctx)
 			ctx.reset()
 			ctx.path = path
 			ctx.Request = req
 			ctx.Writer = w
-			ctx.handlers = handlers
+			ctx.handlers = value.handlers
+			ctx.routerPath = value.fullPath
 
-			if ps != nil {
-				ctx.Params = *ps
+			if value.params != nil {
+				ctx.Params = *value.params
 				ctx.Next()
-				r.putParams(ps)
+				r.putParams(value.params)
 			} else {
 				ctx.Next()
 			}

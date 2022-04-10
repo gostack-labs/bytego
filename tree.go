@@ -1,3 +1,4 @@
+//BSD licence at https://github.com/julienschmidt/httprouter/blob/master/LICENSE
 package bytego
 
 import (
@@ -91,6 +92,7 @@ type node struct {
 	priority  uint32
 	children  []*node
 	handlers  []HandlerFunc
+	fullPath  string
 }
 
 // Increments priority of the given child and reorders if necessary
@@ -128,7 +130,7 @@ func (n *node) addRoute(path string, handlers ...HandlerFunc) {
 		n.nType = root
 		return
 	}
-
+	parentFullPathIndex := 0
 walk:
 	for {
 		// Find the longest common prefix.
@@ -146,6 +148,7 @@ walk:
 				children:  n.children,
 				handlers:  n.handlers,
 				priority:  n.priority - 1,
+				fullPath:  n.fullPath,
 			}
 
 			n.children = []*node{&child}
@@ -154,6 +157,7 @@ walk:
 			n.path = path[:i]
 			n.handlers = nil
 			n.wildChild = false
+			n.fullPath = fullPath[:parentFullPathIndex+i]
 		}
 
 		// Make new node a child of this node
@@ -190,6 +194,7 @@ walk:
 
 			// '/' after param
 			if n.nType == param && idxc == '/' && len(n.children) == 1 {
+				parentFullPathIndex += len(n.path)
 				n = n.children[0]
 				n.priority++
 				continue walk
@@ -198,6 +203,7 @@ walk:
 			// Check if a child with the next path byte exists
 			for i, c := range []byte(n.indices) {
 				if c == idxc {
+					parentFullPathIndex += len(n.path)
 					i = n.incrementChildPrio(i)
 					n = n.children[i]
 					continue walk
@@ -208,7 +214,9 @@ walk:
 			if idxc != ':' && idxc != '*' {
 				// []byte for proper unicode char conversion, see #65
 				n.indices += string([]byte{idxc})
-				child := &node{}
+				child := &node{
+					fullPath: fullPath,
+				}
 				n.children = append(n.children, child)
 				n.incrementChildPrio(len(n.indices) - 1)
 				n = child
@@ -222,6 +230,7 @@ walk:
 			panic("a handle is already registered for path '" + fullPath + "'")
 		}
 		n.handlers = handlers
+		n.fullPath = fullPath
 		return
 	}
 }
@@ -262,8 +271,9 @@ func (n *node) insertChild(path, fullPath string, handlers ...HandlerFunc) {
 
 			n.wildChild = true
 			child := &node{
-				nType: param,
-				path:  wildcard,
+				nType:    param,
+				path:     wildcard,
+				fullPath: fullPath,
 			}
 			n.children = []*node{child}
 			n = child
@@ -275,6 +285,7 @@ func (n *node) insertChild(path, fullPath string, handlers ...HandlerFunc) {
 				path = path[len(wildcard):]
 				child := &node{
 					priority: 1,
+					fullPath: fullPath,
 				}
 				n.children = []*node{child}
 				n = child
@@ -307,6 +318,7 @@ func (n *node) insertChild(path, fullPath string, handlers ...HandlerFunc) {
 		child := &node{
 			wildChild: true,
 			nType:     catchAll,
+			fullPath:  fullPath,
 		}
 		n.children = []*node{child}
 		n.indices = string('/')
@@ -319,9 +331,10 @@ func (n *node) insertChild(path, fullPath string, handlers ...HandlerFunc) {
 			nType:    catchAll,
 			handlers: handlers,
 			priority: 1,
+			fullPath: fullPath,
 		}
 		n.children = []*node{child}
-
+		n.fullPath = fullPath
 		return
 	}
 
@@ -330,12 +343,19 @@ func (n *node) insertChild(path, fullPath string, handlers ...HandlerFunc) {
 	n.handlers = handlers
 }
 
+type nodeValue struct {
+	handlers []HandlerFunc
+	params   *Params
+	tsr      bool
+	fullPath string
+}
+
 // Returns the handle registered with the given path (key). The values of
 // wildcards are saved to a map.
 // If no handle can be found, a TSR (trailing slash redirect) recommendation is
 // made if a handle exists with an extra (without the) trailing slash for the
 // given path.
-func (n *node) getValue(path string, params func() *Params) (handlers []HandlerFunc, ps *Params, tsr bool) {
+func (n *node) getValue(path string, params func() *Params) (value nodeValue) {
 walk: // Outer loop for walking the tree
 	for {
 		prefix := n.path
@@ -358,7 +378,7 @@ walk: // Outer loop for walking the tree
 					// Nothing found.
 					// We can recommend to redirect to the same URL without a
 					// trailing slash if a leaf exists for that path.
-					tsr = (path == "/" && n.handlers != nil)
+					value.tsr = (path == "/" && n.handlers != nil)
 					return
 				}
 
@@ -374,13 +394,13 @@ walk: // Outer loop for walking the tree
 
 					// Save param value
 					if params != nil {
-						if ps == nil {
-							ps = params()
+						if value.params == nil {
+							value.params = params()
 						}
 						// Expand slice within preallocated capacity
-						i := len(*ps)
-						*ps = (*ps)[:i+1]
-						(*ps)[i] = Param{
+						i := len(*value.params)
+						*value.params = (*value.params)[:i+1]
+						(*value.params)[i] = Param{
 							Key:   n.path[1:],
 							Value: path[:end],
 						}
@@ -395,17 +415,18 @@ walk: // Outer loop for walking the tree
 						}
 
 						// ... but we can't
-						tsr = (len(path) == end+1)
+						value.tsr = (len(path) == end+1)
 						return
 					}
 
-					if handlers = n.handlers; handlers != nil {
+					if value.handlers = n.handlers; value.handlers != nil {
+						value.fullPath = n.fullPath
 						return
 					} else if len(n.children) == 1 {
 						// No handle found. Check if a handle for this path + a
 						// trailing slash exists for TSR recommendation
 						n = n.children[0]
-						tsr = (n.path == "/" && n.handlers != nil) || (n.path == "" && n.indices == "/")
+						value.tsr = (n.path == "/" && n.handlers != nil) || (n.path == "" && n.indices == "/")
 					}
 
 					return
@@ -413,19 +434,20 @@ walk: // Outer loop for walking the tree
 				case catchAll:
 					// Save param value
 					if params != nil {
-						if ps == nil {
-							ps = params()
+						if value.params == nil {
+							value.params = params()
 						}
 						// Expand slice within preallocated capacity
-						i := len(*ps)
-						*ps = (*ps)[:i+1]
-						(*ps)[i] = Param{
+						i := len(*value.params)
+						*value.params = (*value.params)[:i+1]
+						(*value.params)[i] = Param{
 							Key:   n.path[2:],
 							Value: path,
 						}
 					}
 
-					handlers = n.handlers
+					value.handlers = n.handlers
+					value.fullPath = n.fullPath
 					return
 
 				default:
@@ -435,7 +457,7 @@ walk: // Outer loop for walking the tree
 		} else if path == prefix {
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
-			if handlers = n.handlers; handlers != nil {
+			if value.handlers = n.handlers; value.handlers != nil {
 				return
 			}
 
@@ -443,7 +465,7 @@ walk: // Outer loop for walking the tree
 			// wildcard child, there must be a handle for this path with an
 			// additional trailing slash
 			if path == "/" && n.wildChild && n.nType != root {
-				tsr = true
+				value.tsr = true
 				return
 			}
 
@@ -452,7 +474,7 @@ walk: // Outer loop for walking the tree
 			for i, c := range []byte(n.indices) {
 				if c == '/' {
 					n = n.children[i]
-					tsr = (len(n.path) == 1 && n.handlers != nil) ||
+					value.tsr = (len(n.path) == 1 && n.handlers != nil) ||
 						(n.nType == catchAll && n.children[0].handlers != nil)
 					return
 				}
@@ -462,7 +484,7 @@ walk: // Outer loop for walking the tree
 
 		// Nothing found. We can recommend to redirect to the same URL with an
 		// extra trailing slash if a leaf exists for that path
-		tsr = (path == "/") ||
+		value.tsr = (path == "/") ||
 			(len(prefix) == len(path)+1 && prefix[len(path)] == '/' &&
 				path == prefix[:len(prefix)-1] && n.handlers != nil)
 		return

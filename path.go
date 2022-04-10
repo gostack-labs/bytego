@@ -1,3 +1,5 @@
+//BSD licence at https://github.com/julienschmidt/httprouter/blob/master/LICENSE
+
 package bytego
 
 // CleanPath is the URL version of path.Clean, it returns a canonical URL path
