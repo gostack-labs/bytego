@@ -3,7 +3,6 @@ package bytego
 import (
 	"encoding/json"
 	"encoding/xml"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -93,8 +92,14 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 	for i := 0; i < dtype.NumField(); i++ {
 		filed := dtype.Field(i)
 		filedVal := dval.Field(i)
-		log.Println(filed.Name, filedVal.CanSet(), parentTagValue)
-
+		if filed.Anonymous {
+			if filedVal.Kind() == reflect.Ptr {
+				if filedVal.IsNil() {
+					ptr := reflect.New(filedVal.Type().Elem())
+					filedVal.Set(ptr)
+				}
+			}
+		}
 		if !filedVal.CanSet() {
 			continue
 		}
@@ -122,6 +127,23 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 				return err
 			}
 		}
+		if filedVal.Kind() == reflect.Ptr {
+			if !filed.Anonymous && filedVal.IsNil() && tagName != "" {
+				for k := range data {
+					if strings.HasPrefix(strings.ToLower(k), strings.ToLower(tagName+".")) {
+						ptr := reflect.New(filedVal.Type().Elem())
+						filedVal.Set(ptr)
+						continue
+					}
+				}
+			}
+			if !filedVal.IsNil() {
+				if err := b.bindData(filedVal.Interface(), data, tag, tagName); err != nil {
+					return err
+				}
+			}
+		}
+
 		if !exists {
 			continue
 		}

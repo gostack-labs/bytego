@@ -94,11 +94,20 @@ func main() {
 	type City struct {
 		CityName string
 	}
+	type WantJob struct {
+		JobName string
+	}
+	type People struct {
+		Name   string  `json:"name,omitempty"`
+		Parent *People `json:"parent,omitempty"`
+	}
 	type Student struct {
 		Name   string `xml:"name,omitempty" form:"formname"`
 		Age    int    `xml:"age,omitempty"`
 		School School `form:"sch"`
 		City
+		*WantJob
+		Parent *People
 	}
 	app.GET("/xml", func(c *bytego.Ctx) error {
 		return c.XML(200, &Student{Name: "hao", Age: 18})
