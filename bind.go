@@ -102,7 +102,7 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 		if tagName == "-" {
 			continue
 		}
-		if tagName == "" {
+		if tagName == "" && !filed.Anonymous {
 			tagName = filed.Name
 		}
 		if parentTagValue != "" {
