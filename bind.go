@@ -21,7 +21,9 @@ const (
 	MIMEYAML              = "application/x-yaml"
 )
 
-type binder struct{}
+type binder struct {
+	validate Validate
+}
 
 func (b *binder) Bind(c *Ctx, i interface{}) error {
 	if err := b.bindParams(c, i); err != nil {
@@ -33,7 +35,13 @@ func (b *binder) Bind(c *Ctx, i interface{}) error {
 	if err := b.bindHeaders(c, i); err != nil {
 		return err
 	}
-	return b.bindBody(c, i)
+	if err := b.bindBody(c, i); err != nil {
+		return err
+	}
+	if b.validate != nil {
+		return b.validate(i)
+	}
+	return nil
 }
 
 func (b *binder) bindParams(c *Ctx, i interface{}) error {

@@ -38,6 +38,7 @@ func NewErrorResult(code int, msg string, data ...interface{}) *ErrorReult {
 func main() {
 	app := bytego.New()
 	app.Debug(true)
+	// app.Validator(validator.New().Struct) //import github.com/go-playground/validator/v10
 	app.Use(recovery.Recover(func(c *bytego.Ctx, err interface{}) {
 		var errMsg string
 		if e, ok := err.(error); ok {
@@ -103,11 +104,14 @@ func main() {
 	}
 	type Student struct {
 		Name   string `xml:"name,omitempty" form:"formname"`
-		Age    int    `xml:"age,omitempty"`
+		Age    int    `xml:"age,omitempty" validate:"gte=0,lte=60"`
 		School School `form:"sch"`
 		City
 		*WantJob
-		Parent *People
+		Parent  *People
+		Header1 string `header:"request-id"`
+		Query1  string `query:"query1"`
+		Param1  string `param:"id"`
 	}
 	app.GET("/xml", func(c *bytego.Ctx) error {
 		return c.XML(200, &Student{Name: "hao", Age: 18})
@@ -122,7 +126,8 @@ func main() {
 	//curl -d '<student><name>test</name><age>18</age></student>' -H 'content-type:application/xml' http://localhost:8080/bind/student
 	//curl -d 'formname=test&age=18&sch.schname=aa' -H 'content-type:application/x-www-form-urlencoded' http://localhost:8080/bind/student
 	//curl -d 'formname=test&age=18&sch.schname=aa'  http://localhost:8080/bind/student
-	app.POST("/bind/student", func(c *bytego.Ctx) error {
+	//curl -d 'formname=test&age=18&sch.schname=aa&cityname=hz&jobname=programer&parent.name=pname&parent.parent.name=ppname'  http://localhost:8080/bind/student
+	app.POST("/bind/student/:id", func(c *bytego.Ctx) error {
 		var s Student
 		if err := c.Bind(&s); err != nil {
 			return err
