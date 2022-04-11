@@ -83,23 +83,42 @@ func main() {
 		panic("this a error")
 	})
 	app.GET("/json", func(c *bytego.Ctx) error {
-		return c.JSON(200, map[string]string{
+		return c.JSON(200, bytego.Map{
 			"a": "b",
 			"c": "d",
 		})
 	})
+	type School struct {
+		Name string `form:"schname"`
+	}
+	type City struct {
+		CityName string
+	}
+	type Student struct {
+		Name   string `xml:"name,omitempty" form:"formname"`
+		Age    int    `xml:"age,omitempty"`
+		School School `form:"sch"`
+		City
+	}
 	app.GET("/xml", func(c *bytego.Ctx) error {
-		type student struct {
-			Name string `xml:"name,omitempty"`
-			Age  int    `xml:"age,omitempty"`
-		}
-		return c.XML(200, &student{Name: "hao", Age: 18})
+		return c.XML(200, &Student{Name: "hao", Age: 18})
 	})
 	app.GET("/jsonp", func(c *bytego.Ctx) error {
-		return c.JSONP(200, map[string]string{
+		return c.JSONP(200, bytego.Map{
 			"a": "b",
 			"c": "d",
 		})
+	})
+	//curl -d '{"name":"a","age":22}' -H 'content-type:application/json' http://localhost:8080/bind/student
+	//curl -d '<student><name>test</name><age>18</age></student>' -H 'content-type:application/xml' http://localhost:8080/bind/student
+	//curl -d 'formname=test&age=18&sch.schname=aa' -H 'content-type:application/x-www-form-urlencoded' http://localhost:8080/bind/student
+	//curl -d 'formname=test&age=18&sch.schname=aa'  http://localhost:8080/bind/student
+	app.POST("/bind/student", func(c *bytego.Ctx) error {
+		var s Student
+		if err := c.Bind(&s); err != nil {
+			return err
+		}
+		return c.JSON(200, s)
 	})
 
 	app.Any("/any", func(c *bytego.Ctx) error {

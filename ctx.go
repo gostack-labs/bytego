@@ -20,6 +20,7 @@ type Ctx struct {
 	sameSite   http.SameSite
 	routerPath string
 	isDebug    bool
+	binder     *binder
 }
 
 const (
@@ -174,6 +175,10 @@ func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, sec
 
 func (c *Ctx) IsDebug() bool {
 	return c.isDebug
+}
+
+func (c *Ctx) Bind(i interface{}) error {
+	return c.binder.Bind(c, i)
 }
 
 func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {

@@ -32,6 +32,7 @@ func newRouter() *route {
 	r := &route{
 		basePath:     "/",
 		errorHandler: defaultErrorHandler,
+		binder:       &binder{},
 	}
 	r.pool.New = func() interface{} {
 		return &Ctx{}
@@ -48,6 +49,7 @@ type route struct {
 	handlers     []HandlerFunc
 	errorHandler ErrorHandler
 	isDebug      bool
+	binder       *binder
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -62,6 +64,7 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			ctx.handlers = value.handlers
 			ctx.routerPath = value.fullPath
 			ctx.isDebug = r.isDebug
+			ctx.binder = r.binder
 
 			var err error
 			if value.params != nil {
