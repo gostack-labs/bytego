@@ -21,6 +21,7 @@ type Router interface {
 	HEAD(path string, handlers ...HandlerFunc) Router
 	PATCH(path string, handlers ...HandlerFunc) Router
 	OPTIONS(path string, handlers ...HandlerFunc) Router
+	TRACE(path string, handlers ...HandlerFunc) Router
 	Handle(method string, path string, handlers ...HandlerFunc) Router
 	Any(path string, handlers ...HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
@@ -60,11 +61,12 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			ctx.reset()
 			ctx.path = path
 			ctx.Request = req
-			ctx.Writer = w
+			ctx.Response = newResponseWriter(w)
 			ctx.handlers = value.handlers
-			ctx.routerPath = value.fullPath
+			ctx.routePath = value.fullPath
 			ctx.isDebug = r.isDebug
 			ctx.binder = r.binder
+			ctx.errorHandler = r.errorHandler
 
 			var err error
 			if value.params != nil {
@@ -75,7 +77,8 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				err = ctx.Next()
 			}
 			if err != nil {
-				r.errorHandler(err, ctx)
+				ctx.HandleError(err)
+				// r.errorHandler(err, ctx)
 			}
 			r.pool.Put(ctx)
 			return
@@ -111,6 +114,9 @@ func (r *route) PATCH(path string, handlers ...HandlerFunc) Router {
 
 func (r *route) OPTIONS(path string, handlers ...HandlerFunc) Router {
 	return r.add(http.MethodOptions, path, handlers...)
+}
+func (r *route) TRACE(path string, handlers ...HandlerFunc) Router {
+	return r.add(http.MethodTrace, path, handlers...)
 }
 
 func (r *route) Any(path string, handlers ...HandlerFunc) Router {

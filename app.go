@@ -33,7 +33,17 @@ func (a *App) Handler() http.Handler {
 }
 
 func (a *App) Validator(fc Validate) {
+	if fc == nil {
+		return
+	}
 	a.route.binder.validate = fc
+}
+
+func (a *App) ErrorHandler(fc ErrorHandler) {
+	if fc == nil {
+		return
+	}
+	a.route.errorHandler = fc
 }
 
 func (a *App) Run(addr string) error {

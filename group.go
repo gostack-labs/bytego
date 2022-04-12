@@ -44,6 +44,9 @@ func (g *Group) PATCH(relativePath string, handlers ...HandlerFunc) Router {
 func (g *Group) OPTIONS(relativePath string, handlers ...HandlerFunc) Router {
 	return g.Handle(http.MethodOptions, relativePath, handlers...)
 }
+func (g *Group) TRACE(relativePath string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodTrace, relativePath, handlers...)
+}
 
 func (g *Group) Any(relativePath string, handlers ...HandlerFunc) Router {
 	for _, method := range anyMethods {

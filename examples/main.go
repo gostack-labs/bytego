@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gostack-labs/bytego"
+	"github.com/gostack-labs/bytego/middleware/logger"
 	"github.com/gostack-labs/bytego/middleware/recovery"
 )
 
@@ -37,7 +38,7 @@ func NewErrorResult(code int, msg string, data ...interface{}) *ErrorReult {
 
 func main() {
 	app := bytego.New()
-	app.Debug(true)
+	// app.Debug(true)
 	// app.Validator(validator.New().Struct) //import github.com/go-playground/validator/v10
 	app.Use(recovery.Recover(func(c *bytego.Ctx, err interface{}) {
 		var errMsg string
@@ -52,6 +53,7 @@ func main() {
 			"msg":  errMsg,
 		})
 	}))
+	app.Use(logger.New())
 	app.Use(func(c *bytego.Ctx) error {
 		log.Println("log--pre")
 		err := c.Next()
@@ -75,7 +77,7 @@ func main() {
 		return c.String(200, c.Query("id"))
 	})
 	app.GET("/user/:id", func(c *bytego.Ctx) error {
-		return c.String(200, c.Param("id")+c.RouterPath())
+		return c.String(200, c.Param("id")+c.RoutePath())
 	})
 	app.POST("/user/update", func(c *bytego.Ctx) error {
 		return c.String(200, c.Form("new_name"))

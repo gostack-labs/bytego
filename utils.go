@@ -20,7 +20,11 @@ func endWithChar(str string, c byte) bool {
 	return str[len(str)-1] == c
 }
 
-// stringToBytes converts string to byte slice without a memory allocation.
+// StringToBytes converts string to byte slice without a memory allocation.
 func stringToBytes(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&s))
+}
+
+func bytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }

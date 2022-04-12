@@ -10,29 +10,27 @@ import (
 )
 
 type Ctx struct {
-	path       string
-	index      int
-	handlers   []HandlerFunc
-	Method     string
-	Writer     http.ResponseWriter
-	Request    *http.Request
-	Params     Params
-	sameSite   http.SameSite
-	routerPath string
-	isDebug    bool
-	binder     *binder
+	path         string
+	index        int
+	handlers     []HandlerFunc
+	Method       string
+	Response     ResponseWriter
+	Request      *http.Request
+	Params       Params
+	sameSite     http.SameSite
+	routePath    string
+	isDebug      bool
+	binder       *binder
+	errorHandler ErrorHandler
+	errorHandled bool
 }
-
-const (
-	jsonContentType = "application/json; charset=utf-8"
-	xmlContentType  = "application/xml; charset=utf-8"
-)
 
 func (c *Ctx) reset() {
 	c.index = -1
 	c.handlers = nil
-	c.Writer = nil
+	c.Response = nil
 	c.Request = nil
+	c.errorHandled = false
 }
 
 func (c *Ctx) Param(key string) string {
@@ -49,17 +47,33 @@ func (c *Ctx) Form(key string) string {
 	return c.Request.FormValue(key)
 }
 
-func (c *Ctx) Status(code int) {
-	c.Writer.WriteHeader(code)
+func (c *Ctx) Cookie(name string) (*http.Cookie, error) {
+	return c.Request.Cookie(name)
 }
 
-func (c *Ctx) RouterPath() string {
-	return c.routerPath
+func (c *Ctx) Status(code int) {
+	c.Response.WriteHeader(code)
+}
+
+func (c *Ctx) RoutePath() string {
+	return c.routePath
+}
+
+func (c *Ctx) Header(key, value string) {
+	if value == "" {
+		c.Response.Header().Del(key)
+		return
+	}
+	c.Response.Header().Set(key, value)
+}
+
+func (c *Ctx) GetHeader(key string) string {
+	return c.Request.Header.Get(key)
 }
 
 func (c *Ctx) String(code int, s string) error {
 	c.Status(code)
-	_, err := c.Writer.Write([]byte(s))
+	_, err := c.Response.Write([]byte(s))
 	return err
 }
 
@@ -69,8 +83,8 @@ func (c *Ctx) JSON(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Writer, jsonContentType)
-	_, err = c.Writer.Write(bs)
+	c.writeContentType(c.Response, jsonContentType)
+	_, err = c.Response.Write(bs)
 	return err
 }
 
@@ -83,17 +97,17 @@ func (c *Ctx) JSONP(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Writer, jsonContentType)
-	if _, err = c.Writer.Write(stringToBytes(callback)); err != nil {
+	c.writeContentType(c.Response, jsonContentType)
+	if _, err = c.Response.Write(stringToBytes(callback)); err != nil {
 		return err
 	}
-	if _, err = c.Writer.Write([]byte{'('}); err != nil {
+	if _, err = c.Response.Write([]byte{'('}); err != nil {
 		return err
 	}
-	if _, err = c.Writer.Write(b); err != nil {
+	if _, err = c.Response.Write(b); err != nil {
 		return err
 	}
-	if _, err = c.Writer.Write([]byte{')', ';'}); err != nil {
+	if _, err = c.Response.Write([]byte{')', ';'}); err != nil {
 		return err
 	}
 	return err
@@ -104,8 +118,8 @@ func (c *Ctx) XML(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Writer, xmlContentType)
-	_, err = c.Writer.Write(bs)
+	c.writeContentType(c.Response, xmlContentType)
+	_, err = c.Response.Write(bs)
 	return err
 }
 
@@ -135,12 +149,33 @@ func (c *Ctx) AbortWithStatus(code int) {
 	c.Abort()
 }
 
+func (c *Ctx) HandleError(err error) {
+	if !c.errorHandled {
+		c.errorHandler(err, c)
+	}
+	c.errorHandled = true
+}
+
 func (c *Ctx) RemoteIP() string {
 	ip, _, err := net.SplitHostPort(strings.TrimSpace(c.Request.RemoteAddr))
 	if err != nil {
 		return ""
 	}
 	return ip
+}
+
+func (c *Ctx) ClientIP() string {
+	if ip := c.Request.Header.Get(HeaderXForwardedFor); ip != "" {
+		i := strings.IndexAny(ip, ",")
+		if i > 0 {
+			return strings.TrimSpace(ip[:i])
+		}
+		return ip
+	}
+	if ip := c.Request.Header.Get(HeaderXRealIP); ip != "" {
+		return ip
+	}
+	return c.RemoteIP()
 }
 
 func (c *Ctx) ContentType() string {
@@ -161,7 +196,7 @@ func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, sec
 	if path == "" {
 		path = "/"
 	}
-	http.SetCookie(c.Writer, &http.Cookie{
+	http.SetCookie(c.Response, &http.Cookie{
 		Name:     name,
 		Value:    url.QueryEscape(value),
 		MaxAge:   maxAge,
