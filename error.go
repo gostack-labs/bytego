@@ -28,7 +28,7 @@ func defaultErrorHandler(err error, c *Ctx) {
 	}
 
 	if c.Request.Method == http.MethodHead {
-		_ = c.EmptyContent(statusCode)
+		_ = c.NoContent(statusCode)
 	} else {
 		_ = c.JSON(statusCode, Map{
 			"code": code,

@@ -123,7 +123,7 @@ func (c *Ctx) XML(code int, i interface{}) error {
 	return err
 }
 
-func (c *Ctx) EmptyContent(code int) error {
+func (c *Ctx) NoContent(code int) error {
 	c.Status(code)
 	return nil
 }
