@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gostack-labs/bytego"
+	"github.com/gostack-labs/bytego/middleware/cors"
 	"github.com/gostack-labs/bytego/middleware/logger"
 	"github.com/gostack-labs/bytego/middleware/recovery"
 )
@@ -54,6 +55,10 @@ func main() {
 		})
 	}))
 	app.Use(logger.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"https://bytego.dev", "http://localhost:8000"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
+	}))
 	app.Use(func(c *bytego.Ctx) error {
 		log.Println("log--pre")
 		err := c.Next()
