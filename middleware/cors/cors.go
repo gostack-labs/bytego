@@ -19,6 +19,9 @@ func New(config ...Config) bytego.HandlerFunc {
 		if len(cfg.AllowOrigins) == 0 {
 			cfg.AllowOrigins = DefaultConfig.AllowOrigins
 		}
+		if cfg.MaxAge <= 0 {
+			cfg.MaxAge = DefaultConfig.MaxAge
+		}
 	}
 	allowMethods := strings.Join(cfg.AllowMethods, ",")
 	allowHeaders := strings.Join(cfg.AllowHeaders, ",")
@@ -69,9 +72,10 @@ func New(config ...Config) bytego.HandlerFunc {
 
 		// Options request
 		// Preflight request
-		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderOrigin)
-		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderAccessControlRequestMethod)
-		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderAccessControlRequestHeaders)
+		c.AppendHeader(bytego.HeaderVary, bytego.HeaderOrigin)
+		c.AppendHeader(bytego.HeaderVary, bytego.HeaderAccessControlRequestMethod)
+		c.AppendHeader(bytego.HeaderVary, bytego.HeaderAccessControlRequestHeaders)
+		c.AppendHeader(bytego.HeaderVary, "dddd")
 		c.Header(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
 		c.Header(bytego.HeaderAccessControlAllowMethods, allowMethods)
 
@@ -94,7 +98,7 @@ func New(config ...Config) bytego.HandlerFunc {
 		if cfg.MaxAge > 0 {
 			c.Header(bytego.HeaderAccessControlMaxAge, maxAge)
 		}
-		c.Status(http.StatusNoContent)
+		c.AbortWithStatus(http.StatusNoContent)
 		return nil
 	}
 }

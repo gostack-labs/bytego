@@ -73,6 +73,25 @@ func (c *Ctx) GetHeader(key string) string {
 	return c.Request.Header.Get(key)
 }
 
+func (c *Ctx) AppendHeader(key string, values ...string) {
+	if len(values) == 0 {
+		return
+	}
+	h := c.Response.Header().Get(key)
+	originalH := h
+	for _, value := range values {
+		if len(h) == 0 {
+			h = value
+		} else if h != value && !strings.HasPrefix(h, value+",") && !strings.HasSuffix(h, " "+value) &&
+			!strings.Contains(h, " "+value+",") {
+			h += ", " + value
+		}
+	}
+	if originalH != h {
+		c.Header(key, h)
+	}
+}
+
 func (c *Ctx) String(code int, s string) error {
 	c.Status(code)
 	_, err := c.Response.Write([]byte(s))
