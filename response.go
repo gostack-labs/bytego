@@ -14,7 +14,7 @@ type ResponseWriter interface {
 	Committed() bool
 }
 
-func newResponseWriter(w http.ResponseWriter) ResponseWriter {
+func newResponseWriter(w http.ResponseWriter) *responseWriter {
 	return &responseWriter{
 		ResponseWriter: w,
 	}

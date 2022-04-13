@@ -22,3 +22,7 @@ const (
 	jsonContentType = "application/json; charset=utf-8"
 	xmlContentType  = "application/xml; charset=utf-8"
 )
+
+var (
+	default404Body = []byte("404 page not found")
+)

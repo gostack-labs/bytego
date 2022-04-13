@@ -28,6 +28,9 @@ func New(config ...Config) bytego.HandlerFunc {
 
 	return func(c *bytego.Ctx) error {
 		origin := c.GetHeader(bytego.HeaderOrigin)
+		if len(origin) == 0 {
+			return nil
+		}
 		allowOrigin := ""
 		// Check allowed origins
 		for _, o := range cfg.AllowOrigins {
@@ -45,9 +48,14 @@ func New(config ...Config) bytego.HandlerFunc {
 			}
 		}
 
+		if allowOrigin == "" {
+			c.AbortWithStatus(http.StatusForbidden)
+			return nil
+		}
+
 		// Simple request
 		if c.Request.Method != http.MethodOptions {
-			c.Header(bytego.HeaderVary, bytego.HeaderOrigin)
+			c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderOrigin)
 			c.Header(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
 
 			if cfg.AllowCredentials {
@@ -61,9 +69,9 @@ func New(config ...Config) bytego.HandlerFunc {
 
 		// Options request
 		// Preflight request
-		c.Header(bytego.HeaderVary, bytego.HeaderOrigin)
-		c.Header(bytego.HeaderVary, bytego.HeaderAccessControlRequestMethod)
-		c.Header(bytego.HeaderVary, bytego.HeaderAccessControlRequestHeaders)
+		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderOrigin)
+		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderAccessControlRequestMethod)
+		c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderAccessControlRequestHeaders)
 		c.Header(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
 		c.Header(bytego.HeaderAccessControlAllowMethods, allowMethods)
 
@@ -86,6 +94,7 @@ func New(config ...Config) bytego.HandlerFunc {
 		if cfg.MaxAge > 0 {
 			c.Header(bytego.HeaderAccessControlMaxAge, maxAge)
 		}
-		return c.NoContent(http.StatusNoContent)
+		c.Status(http.StatusNoContent)
+		return nil
 	}
 }

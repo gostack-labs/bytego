@@ -26,6 +26,7 @@ type Router interface {
 	Any(path string, handlers ...HandlerFunc) Router
 	Group(relativePath string, handlers ...HandlerFunc) *Group
 	Use(middlewares ...HandlerFunc)
+	NoRoute(handlers ...HandlerFunc)
 	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
@@ -42,32 +43,36 @@ func newRouter() *route {
 }
 
 type route struct {
-	basePath     string
-	paramsPool   sync.Pool
-	trees        map[string]*node
-	maxParams    uint16
-	pool         sync.Pool
-	handlers     []HandlerFunc
-	errorHandler ErrorHandler
-	isDebug      bool
-	binder       *binder
+	basePath           string
+	paramsPool         sync.Pool
+	trees              map[string]*node
+	maxParams          uint16
+	pool               sync.Pool
+	handlers           []HandlerFunc
+	noRouteHandlers    []HandlerFunc
+	allNoRouteHandlers []HandlerFunc
+	errorHandler       ErrorHandler
+	isDebug            bool
+	binder             *binder
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := r.pool.Get().(*Ctx)
+	ctx.reset()
+	ctx.Request = req
+	ctx.writer = newResponseWriter(w)
+	ctx.Response = ctx.writer
+	ctx.isDebug = r.isDebug
+	ctx.binder = r.binder
+	ctx.errorHandler = r.errorHandler
+	defer r.pool.Put(ctx)
+
 	path := req.URL.Path
 	if root := r.trees[req.Method]; root != nil {
 		if value := root.getValue(path, r.getParams); value.handlers != nil {
-			ctx := r.pool.Get().(*Ctx)
-			ctx.reset()
 			ctx.path = path
-			ctx.Request = req
-			ctx.Response = newResponseWriter(w)
 			ctx.handlers = value.handlers
 			ctx.routePath = value.fullPath
-			ctx.isDebug = r.isDebug
-			ctx.binder = r.binder
-			ctx.errorHandler = r.errorHandler
-
 			var err error
 			if value.params != nil {
 				ctx.Params = *value.params
@@ -78,14 +83,31 @@ func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			if err != nil {
 				ctx.HandleError(err)
-				// r.errorHandler(err, ctx)
 			}
-			r.pool.Put(ctx)
 			return
 		}
 	}
 
-	http.NotFound(w, req)
+	ctx.handlers = r.allNoRouteHandlers
+	serveError(ctx, http.StatusNotFound, default404Body)
+}
+func (r *route) NoRoute(handlers ...HandlerFunc) {
+	r.noRouteHandlers = handlers
+	r.rebuild404Handlers()
+}
+
+func (r *route) rebuild404Handlers() {
+	r.allNoRouteHandlers = combineHandlers(r.handlers, r.noRouteHandlers)
+}
+
+func serveError(c *Ctx, code int, defaultMessage []byte) {
+	c.writer.status = code
+	_ = c.Next() //middlewares
+	if c.Response.Committed() {
+		return
+	}
+	c.Status(code)
+	_, _ = c.Response.Write(defaultMessage)
 }
 
 func (r *route) GET(path string, handlers ...HandlerFunc) Router {
@@ -140,6 +162,7 @@ func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
 
 func (r *route) Use(middlewares ...HandlerFunc) {
 	r.handlers = append(r.handlers, middlewares...)
+	r.rebuild404Handlers()
 }
 
 func (r *route) add(method, path string, handlers ...HandlerFunc) Router {

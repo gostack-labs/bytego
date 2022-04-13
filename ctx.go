@@ -14,6 +14,7 @@ type Ctx struct {
 	index        int
 	handlers     []HandlerFunc
 	Method       string
+	writer       *responseWriter
 	Response     ResponseWriter
 	Request      *http.Request
 	Params       Params
@@ -28,6 +29,7 @@ type Ctx struct {
 func (c *Ctx) reset() {
 	c.index = -1
 	c.handlers = nil
+	c.writer = nil
 	c.Response = nil
 	c.Request = nil
 	c.errorHandled = false
@@ -121,11 +123,6 @@ func (c *Ctx) XML(code int, i interface{}) error {
 	c.writeContentType(c.Response, xmlContentType)
 	_, err = c.Response.Write(bs)
 	return err
-}
-
-func (c *Ctx) NoContent(code int) error {
-	c.Status(code)
-	return nil
 }
 
 func (c *Ctx) Next() error {

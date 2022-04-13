@@ -56,14 +56,21 @@ func main() {
 	}))
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"https://bytego.dev", "http://localhost:8000"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
+		AllowOrigins:     []string{"https://bytego.dev", "http://localhost:8000"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowMethods:     []string{"GET", "PUT", "POST", "DELETE"},
+		AllowCredentials: true,
 	}))
 	app.Use(func(c *bytego.Ctx) error {
 		log.Println("log--pre")
 		err := c.Next()
 		log.Println("log--ok")
 		return err
+	})
+	app.NoRoute(func(c *bytego.Ctx) error {
+		return c.JSON(404, bytego.Map{
+			"err": "not found",
+		})
 	})
 	app.GET("/", func(c *bytego.Ctx) error {
 		return c.String(200, "hello, world!")
@@ -80,6 +87,11 @@ func main() {
 
 	app.GET("/user", func(c *bytego.Ctx) error {
 		return c.String(200, c.Query("id"))
+	})
+	app.DELETE("/user", func(c *bytego.Ctx) error {
+		return c.JSON(200, bytego.Map{
+			"ok": true,
+		})
 	})
 	app.GET("/user/:id", func(c *bytego.Ctx) error {
 		return c.String(200, c.Param("id")+c.RoutePath())

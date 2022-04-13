@@ -49,8 +49,8 @@ var DefaultConfig = Config{
 		http.MethodDelete,
 		http.MethodPatch,
 	},
-	AllowHeaders:     []string{},
+	AllowHeaders:     []string{"Content-Type"},
 	AllowCredentials: false,
 	ExposeHeaders:    []string{},
-	MaxAge:           0,
+	MaxAge:           12 * 60 * 60,
 }
