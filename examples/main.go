@@ -9,6 +9,7 @@ import (
 	"github.com/gostack-labs/bytego"
 	"github.com/gostack-labs/bytego/middleware/cors"
 	"github.com/gostack-labs/bytego/middleware/logger"
+	"github.com/gostack-labs/bytego/middleware/pprof"
 	"github.com/gostack-labs/bytego/middleware/recovery"
 )
 
@@ -61,6 +62,7 @@ func main() {
 		AllowMethods:     []string{"GET", "PUT", "POST", "DELETE"},
 		AllowCredentials: true,
 	}))
+	pprof.Register(app, pprof.WithPrefix("/debug/pprof"))
 	app.Use(func(c *bytego.Ctx) error {
 		log.Println("log--pre")
 		err := c.Next()
