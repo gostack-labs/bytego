@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type Ctx struct {
@@ -237,4 +238,40 @@ func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {
 	if headers := header["Content-Type"]; len(headers) == 0 {
 		header["Content-Type"] = []string{contentType}
 	}
+}
+
+/************************************/
+/***** GOLANG.ORG/X/NET/CONTEXT *****/
+/************************************/
+
+// Deadline always returns that there is no deadline (ok==false),
+// maybe you want to use Request.Context().Deadline() instead.
+func (c *Ctx) Deadline() (deadline time.Time, ok bool) {
+	return
+}
+
+// Done always returns nil (chan which will wait forever),
+// if you want to abort your work when the connection was closed
+// you should use Request.Context().Done() instead.
+func (c *Ctx) Done() <-chan struct{} {
+	return nil
+}
+
+// Err always returns nil, maybe you want to use Request.Context().Err() instead.
+func (c *Ctx) Err() error {
+	return nil
+}
+
+// Value returns the value associated with this context for key, or nil
+// if no value is associated with key. Successive calls to Value with
+// the same key returns the same result.
+func (c *Ctx) Value(key interface{}) interface{} {
+	if key == 0 {
+		return c.Request
+	}
+	if keyAsString, ok := key.(string); ok {
+		val, _ := c.Params.Get(keyAsString)
+		return val
+	}
+	return nil
 }
