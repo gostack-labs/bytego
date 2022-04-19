@@ -46,7 +46,6 @@ func (c *Ctx) Query(key string) string {
 }
 
 func (c *Ctx) Form(key string) string {
-	c.Request.Cookies()
 	return c.Request.FormValue(key)
 }
 

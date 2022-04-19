@@ -129,10 +129,11 @@ func main() {
 		School School `form:"sch"`
 		City
 		*WantJob
-		Parent  *People
-		Header1 string `header:"request-id"`
-		Query1  string `query:"query1"`
-		Param1  string `param:"id"`
+		Parent     *People
+		Header1    string   `header:"request-id"`
+		Query1     string   `query:"query1"`
+		Param1     string   `param:"id"`
+		LikeColors []string `form:"colors[]"`
 	}
 	app.GET("/xml", func(c *bytego.Ctx) error {
 		return c.XML(200, &Student{Name: "hao", Age: 18})
@@ -143,13 +144,15 @@ func main() {
 			"c": "d",
 		})
 	})
-	//curl -d '{"name":"a","age":22}' -H 'content-type:application/json' http://localhost:8080/bind/student
-	//curl -d '<student><name>test</name><age>18</age></student>' -H 'content-type:application/xml' http://localhost:8080/bind/student
-	//curl -d 'formname=test&age=18&sch.schname=aa' -H 'content-type:application/x-www-form-urlencoded' http://localhost:8080/bind/student
-	//curl -d 'formname=test&age=18&sch.schname=aa'  http://localhost:8080/bind/student
-	//curl -d 'formname=test&age=18&sch.schname=aa&cityname=hz&jobname=programer&parent.name=pname&parent.parent.name=ppname'  http://localhost:8080/bind/student
+	//curl -d '{"name":"a","age":22}' -H 'content-type:application/json' http://localhost:8080/bind/student/1
+	//curl -d '<student><name>test</name><age>18</age></student>' -H 'content-type:application/xml' http://localhost:8080/bind/student/1
+	//curl -d 'formname=test&age=18&sch.schname=aa' -H 'content-type:application/x-www-form-urlencoded' http://localhost:8080/bind/student/1
+	//curl -d 'formname=test&age=18&sch.schname=aa'  http://localhost:8080/bind/student/1
+	//curl -d 'formname=test&age=18&sch.schname=aa&cityname=hz&jobname=programer&parent.name=pname&parent.parent.name=ppname&colors[]=1&colors[]=2'  http://localhost:8080/bind/student/1
 	app.POST("/bind/student/:id", func(c *bytego.Ctx) error {
 		var s Student
+		fmt.Println(c.Form("formname"))
+		fmt.Printf("%v", c.Request.PostForm)
 		if err := c.Bind(&s); err != nil {
 			return err
 		}

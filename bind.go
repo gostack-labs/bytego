@@ -130,12 +130,13 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 				}
 			}
 		}
-		if filedVal.Kind() == reflect.Struct {
+
+		switch filedVal.Kind() {
+		case reflect.Struct:
 			if err := b.bindData(filedVal.Addr().Interface(), data, tag, tagName); err != nil {
 				return err
 			}
-		}
-		if filedVal.Kind() == reflect.Ptr {
+		case reflect.Ptr:
 			if !filed.Anonymous && filedVal.IsNil() && tagName != "" {
 				for k := range data {
 					if strings.HasPrefix(strings.ToLower(k), strings.ToLower(tagName+".")) {
@@ -150,6 +151,14 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 					return err
 				}
 			}
+		case reflect.Slice:
+			slice := reflect.MakeSlice(filedVal.Type(), len(val), len(val))
+			for i, v := range val {
+				if err := b.setField(slice.Index(i), filed, v); err != nil {
+					return err
+				}
+			}
+			filedVal.Set(slice)
 		}
 
 		if !exists {
