@@ -22,7 +22,8 @@ const (
 )
 
 type binder struct {
-	validate Validate
+	validate          Validate
+	validateTranslate ValidateTranslate
 }
 
 func (b *binder) Bind(c *Ctx, i interface{}) error {
@@ -39,7 +40,11 @@ func (b *binder) Bind(c *Ctx, i interface{}) error {
 		return err
 	}
 	if b.validate != nil {
-		return b.validate(i)
+		err := b.validate(i)
+		if err != nil && b.validateTranslate != nil {
+			return b.validateTranslate(err)
+		}
+		return err
 	}
 	return nil
 }

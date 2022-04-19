@@ -23,6 +23,7 @@ func New() *App {
 type HandlerFunc func(*Ctx) error
 type Map map[string]interface{}
 type Validate func(i interface{}) error
+type ValidateTranslate func(err error) error
 
 func (a *App) Use(middlewares ...HandlerFunc) {
 	a.Router.Use(middlewares...)
@@ -32,11 +33,14 @@ func (a *App) Handler() http.Handler {
 	return a
 }
 
-func (a *App) Validator(fc Validate) {
+func (a *App) Validator(fc Validate, trans ...ValidateTranslate) {
 	if fc == nil {
 		return
 	}
 	a.route.binder.validate = fc
+	if len(trans) > 0 {
+		a.route.binder.validateTranslate = trans[0]
+	}
 }
 
 func (a *App) ErrorHandler(fc ErrorHandler) {
