@@ -11,6 +11,10 @@ import (
 	"github.com/gostack-labs/bytego/middleware/logger"
 	"github.com/gostack-labs/bytego/middleware/pprof"
 	"github.com/gostack-labs/bytego/middleware/recovery"
+	// "github.com/go-playground/locales/zh"
+	// ut "github.com/go-playground/universal-translator"
+	// "github.com/go-playground/validator/v10"
+	// translation "github.com/go-playground/validator/v10/translations/zh"
 )
 
 type ErrorReult struct {
@@ -38,10 +42,38 @@ func NewErrorResult(code int, msg string, data ...interface{}) *ErrorReult {
 	}
 }
 
+// func Translate(err error) *ErrorReult {
+// 	if validationErrors, ok := err.(validator.ValidationErrors); !ok {
+// 		return NewErrorResult(1, err.Error())
+// 	} else {
+// 		var ret string
+// 		var errCount int = len(validationErrors)
+// 		if errCount == 1 {
+// 			ret += validationErrors[0].Translate(trans) + "。"
+// 		} else {
+// 			for _, e := range validationErrors {
+// 				ret += e.Translate(trans) + ";"
+// 			}
+// 		}
+// 		return NewErrorResult(1, ret)
+// 	}
+// }
+
+// var trans ut.Translator
+
 func main() {
 	app := bytego.New()
 	// app.Debug(true)
+
+	//validator
 	// app.Validator(validator.New().Struct) //import github.com/go-playground/validator/v10
+
+	//validator translation
+	// validator1 := validator.New()
+	// trans, _ = ut.New(zh.New()).GetTranslator("zh")
+	// _ = translation.RegisterDefaultTranslations(validator1, trans)
+	// app.Validator(validator1.Struct)
+
 	app.Use(recovery.Recover(func(c *bytego.Ctx, err interface{}) {
 		var errMsg string
 		if e, ok := err.(error); ok {
@@ -154,6 +186,7 @@ func main() {
 		fmt.Println(c.Form("formname"))
 		fmt.Printf("%v", c.Request.PostForm)
 		if err := c.Bind(&s); err != nil {
+			// return Translate(err)
 			return err
 		}
 		return c.JSON(200, s)
