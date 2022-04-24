@@ -162,7 +162,7 @@ func (c *Ctx) HTMLBlob(code int, b []byte) (err error) {
 	return err
 }
 
-func (c *Ctx) Render(code int, name string, data interface{}) error {
+func (c *Ctx) View(code int, name string, data interface{}) error {
 	buf := new(bytes.Buffer)
 	if c.app.render == nil {
 		return errors.New("error: render template not set")
