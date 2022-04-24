@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type Ctx struct {
@@ -25,6 +26,8 @@ type Ctx struct {
 	binder       *binder
 	errorHandler ErrorHandler
 	errorHandled bool
+	m            Map
+	mu           sync.RWMutex
 }
 
 func (c *Ctx) reset() {
@@ -244,4 +247,20 @@ func (c *Ctx) Context() context.Context {
 		return c.Request.Context()
 	}
 	return context.Background()
+}
+
+func (c *Ctx) Set(key string, val interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.m == nil {
+		c.m = make(Map)
+	}
+	c.m[key] = val
+}
+func (c *Ctx) Get(key string) (val interface{}, exists bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	val, exists = c.m[key]
+	return
 }
