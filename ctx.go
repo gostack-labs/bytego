@@ -1,9 +1,12 @@
 package bytego
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,19 +15,16 @@ import (
 )
 
 type Ctx struct {
+	app          *App
 	path         string
 	index        int
 	handlers     []HandlerFunc
-	Method       string
 	writer       *responseWriter
 	Response     ResponseWriter
 	Request      *http.Request
 	Params       Params
 	sameSite     http.SameSite
 	routePath    string
-	isDebug      bool
-	binder       *binder
-	errorHandler ErrorHandler
 	errorHandled bool
 	m            Map
 	mu           sync.RWMutex
@@ -33,6 +33,7 @@ type Ctx struct {
 func (c *Ctx) reset() {
 	c.index = -1
 	c.handlers = nil
+	c.Params = c.Params[:0]
 	c.writer = nil
 	c.Response = nil
 	c.Request = nil
@@ -103,12 +104,12 @@ func (c *Ctx) String(code int, s string) error {
 }
 
 func (c *Ctx) JSON(code int, i interface{}) error {
-	c.Status(code)
 	bs, err := json.Marshal(i)
 	if err != nil {
 		return err
 	}
 	c.writeContentType(c.Response, jsonContentType)
+	c.Status(code)
 	_, err = c.Response.Write(bs)
 	return err
 }
@@ -123,6 +124,7 @@ func (c *Ctx) JSONP(code int, i interface{}) error {
 		return err
 	}
 	c.writeContentType(c.Response, jsonContentType)
+	c.Status(code)
 	if _, err = c.Response.Write(stringToBytes(callback)); err != nil {
 		return err
 	}
@@ -144,8 +146,43 @@ func (c *Ctx) XML(code int, i interface{}) error {
 		return err
 	}
 	c.writeContentType(c.Response, xmlContentType)
+	c.Status(code)
 	_, err = c.Response.Write(bs)
 	return err
+}
+
+func (c *Ctx) HTML(code int, html string) error {
+	return c.HTMLBlob(code, []byte(html))
+}
+
+func (c *Ctx) HTMLBlob(code int, b []byte) (err error) {
+	c.writeContentType(c.Response, htmlContentType)
+	c.Status(code)
+	_, err = c.Response.Write(b)
+	return err
+}
+
+func (c *Ctx) Render(code int, name string, data interface{}) error {
+	buf := new(bytes.Buffer)
+	if c.app.render == nil {
+		return errors.New("error: render template not set")
+	}
+	if err := c.app.render.Render(buf, name, data); err != nil {
+		return err
+	}
+	return c.HTMLBlob(code, buf.Bytes())
+}
+
+func (c *Ctx) Redirect(location string, code ...int) error {
+	status := http.StatusFound
+	if len(code) > 0 {
+		status = code[0]
+		if status < http.StatusMultipleChoices || status > http.StatusPermanentRedirect {
+			return fmt.Errorf("error redirect with status code %d", status)
+		}
+	}
+	http.Redirect(c.Response, c.Request, location, status)
+	return nil
 }
 
 func (c *Ctx) Next() error {
@@ -171,7 +208,7 @@ func (c *Ctx) AbortWithStatus(code int) {
 
 func (c *Ctx) HandleError(err error) {
 	if !c.errorHandled {
-		c.errorHandler(err, c)
+		c.app.errorHandler(err, c)
 	}
 	c.errorHandled = true
 }
@@ -229,11 +266,11 @@ func (c *Ctx) SetCookie(name, value string, maxAge int, path, domain string, sec
 }
 
 func (c *Ctx) IsDebug() bool {
-	return c.isDebug
+	return c.app.isDebug
 }
 
 func (c *Ctx) Bind(i interface{}) error {
-	return c.binder.Bind(c, i)
+	return c.app.binder.Bind(c, i)
 }
 
 func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {

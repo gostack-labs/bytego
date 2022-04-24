@@ -21,6 +21,7 @@ const (
 
 	jsonContentType = "application/json; charset=utf-8"
 	xmlContentType  = "application/xml; charset=utf-8"
+	htmlContentType = "text/html; charset=utf-8"
 )
 
 var (

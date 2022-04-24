@@ -20,7 +20,7 @@ func defaultErrorHandler(err error, c *Ctx) {
 	} else {
 		statusCode = http.StatusInternalServerError
 		code = statusCode
-		if c.isDebug {
+		if c.app.isDebug {
 			msg = err.Error()
 		} else {
 			msg = http.StatusText(http.StatusInternalServerError)

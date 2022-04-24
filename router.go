@@ -27,18 +27,14 @@ type Router interface {
 	Group(relativePath string, handlers ...HandlerFunc) *Group
 	Use(middlewares ...HandlerFunc)
 	NoRoute(handlers ...HandlerFunc)
-	ServeHTTP(w http.ResponseWriter, req *http.Request)
+	// ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
 func newRouter() *route {
 	r := &route{
-		basePath:     "/",
-		errorHandler: defaultErrorHandler,
-		binder:       &binder{},
+		basePath: "/",
 	}
-	r.pool.New = func() interface{} {
-		return &Ctx{}
-	}
+
 	return r
 }
 
@@ -47,50 +43,11 @@ type route struct {
 	paramsPool         sync.Pool
 	trees              map[string]*node
 	maxParams          uint16
-	pool               sync.Pool
 	handlers           []HandlerFunc
 	noRouteHandlers    []HandlerFunc
 	allNoRouteHandlers []HandlerFunc
-	errorHandler       ErrorHandler
-	isDebug            bool
-	binder             *binder
 }
 
-func (r *route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := r.pool.Get().(*Ctx)
-	ctx.reset()
-	ctx.Request = req
-	ctx.writer = newResponseWriter(w)
-	ctx.Response = ctx.writer
-	ctx.isDebug = r.isDebug
-	ctx.binder = r.binder
-	ctx.errorHandler = r.errorHandler
-	defer r.pool.Put(ctx)
-
-	path := req.URL.Path
-	if root := r.trees[req.Method]; root != nil {
-		if value := root.getValue(path, r.getParams); value.handlers != nil {
-			ctx.path = path
-			ctx.handlers = value.handlers
-			ctx.routePath = value.fullPath
-			var err error
-			if value.params != nil {
-				ctx.Params = *value.params
-				err = ctx.Next()
-				r.putParams(value.params)
-			} else {
-				err = ctx.Next()
-			}
-			if err != nil {
-				ctx.HandleError(err)
-			}
-			return
-		}
-	}
-
-	ctx.handlers = r.allNoRouteHandlers
-	serveError(ctx, http.StatusNotFound, default404Body)
-}
 func (r *route) NoRoute(handlers ...HandlerFunc) {
 	r.noRouteHandlers = handlers
 	r.rebuild404Handlers()
@@ -137,6 +94,7 @@ func (r *route) PATCH(path string, handlers ...HandlerFunc) Router {
 func (r *route) OPTIONS(path string, handlers ...HandlerFunc) Router {
 	return r.add(http.MethodOptions, path, handlers...)
 }
+
 func (r *route) TRACE(path string, handlers ...HandlerFunc) Router {
 	return r.add(http.MethodTrace, path, handlers...)
 }
