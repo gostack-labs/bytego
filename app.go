@@ -10,7 +10,7 @@ import (
 
 type App struct {
 	server *http.Server
-	route  *route
+	route  *router
 	Router
 	pool         sync.Pool
 	errorHandler ErrorHandler
@@ -67,6 +67,9 @@ func (a *App) ErrorHandler(fc ErrorHandler) {
 }
 
 func (a *App) Render(render Renderer) {
+	if render == nil {
+		return
+	}
 	a.render = render
 }
 
@@ -120,4 +123,18 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	ctx.handlers = a.route.allNoRouteHandlers
 	serveError(ctx, http.StatusNotFound, default404Body)
+}
+
+func serveError(c *Ctx, code int, defaultMessage []byte) {
+	c.writer.status = code
+	_ = c.Next() //middlewares
+	if c.Response.Committed() {
+		return
+	}
+	c.Status(code)
+	_, _ = c.Response.Write(defaultMessage)
+}
+
+func (app *App) NoRoute(handlers ...HandlerFunc) {
+	app.route.noRoute(handlers...)
 }

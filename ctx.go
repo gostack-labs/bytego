@@ -290,12 +290,12 @@ func (c *Ctx) Context() context.Context {
 func (c *Ctx) Set(key string, val interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
 	if c.m == nil {
 		c.m = make(Map)
 	}
 	c.m[key] = val
 }
+
 func (c *Ctx) Get(key string) (val interface{}, exists bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

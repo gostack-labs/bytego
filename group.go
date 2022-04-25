@@ -10,7 +10,7 @@ type Group struct {
 	handlers []HandlerFunc
 }
 
-func (g *Group) Group(relativePath string, handlers ...HandlerFunc) *Group {
+func (g *Group) Group(relativePath string, handlers ...HandlerFunc) Router {
 	return &Group{
 		basePath: joinPath(g.basePath, relativePath),
 		route:    g.route,
@@ -62,4 +62,19 @@ func (g *Group) Use(middlewares ...HandlerFunc) {
 func (g *Group) Handle(method string, relativePath string, handlers ...HandlerFunc) Router {
 	path := joinPath(g.basePath, relativePath)
 	return g.route.Handle(method, path, handlers...)
+}
+
+func (g *Group) Static(relativePath, root string) Router {
+	path := joinPath(g.basePath, relativePath)
+	return g.route.StaticFS(path, http.Dir(root))
+}
+
+func (g *Group) StaticFS(relativePath string, fsys http.FileSystem) Router {
+	path := joinPath(g.basePath, relativePath)
+	return g.route.StaticFS(path, fsys)
+}
+
+func (g *Group) StaticFile(relativePath, filepath string) Router {
+	path := joinPath(g.basePath, relativePath)
+	return g.route.StaticFile(path, filepath)
 }

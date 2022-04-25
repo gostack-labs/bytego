@@ -1,5 +1,7 @@
 package bytego
 
+import "net/http"
+
 const (
 	HeaderContentLength   = "Content-Length"
 	HeaderOrigin          = "Origin"
@@ -25,5 +27,10 @@ const (
 )
 
 var (
+	anyMethods = []string{
+		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect,
+		http.MethodTrace,
+	}
 	default404Body = []byte("404 page not found")
 )

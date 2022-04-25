@@ -2,15 +2,8 @@ package bytego
 
 import (
 	"net/http"
+	"path"
 	"sync"
-)
-
-var (
-	anyMethods = []string{
-		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
-		http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect,
-		http.MethodTrace,
-	}
 )
 
 type Router interface {
@@ -24,21 +17,21 @@ type Router interface {
 	TRACE(path string, handlers ...HandlerFunc) Router
 	Handle(method string, path string, handlers ...HandlerFunc) Router
 	Any(path string, handlers ...HandlerFunc) Router
-	Group(relativePath string, handlers ...HandlerFunc) *Group
+	Static(relativePath, root string) Router
+	StaticFS(relativePath string, fsys http.FileSystem) Router
+	StaticFile(relativePath, filePath string) Router
+	Group(relativePath string, handlers ...HandlerFunc) Router
 	Use(middlewares ...HandlerFunc)
-	NoRoute(handlers ...HandlerFunc)
-	// ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
-func newRouter() *route {
-	r := &route{
+func newRouter() *router {
+	r := &router{
 		basePath: "/",
 	}
-
 	return r
 }
 
-type route struct {
+type router struct {
 	basePath           string
 	paramsPool         sync.Pool
 	trees              map[string]*node
@@ -48,69 +41,51 @@ type route struct {
 	allNoRouteHandlers []HandlerFunc
 }
 
-func (r *route) NoRoute(handlers ...HandlerFunc) {
-	r.noRouteHandlers = handlers
-	r.rebuild404Handlers()
+func (r *router) GET(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodGet, path, handlers...)
 }
 
-func (r *route) rebuild404Handlers() {
-	r.allNoRouteHandlers = combineHandlers(r.handlers, r.noRouteHandlers)
+func (r *router) POST(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodPost, path, handlers...)
 }
 
-func serveError(c *Ctx, code int, defaultMessage []byte) {
-	c.writer.status = code
-	_ = c.Next() //middlewares
-	if c.Response.Committed() {
-		return
-	}
-	c.Status(code)
-	_, _ = c.Response.Write(defaultMessage)
+func (r *router) PUT(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodPut, path, handlers...)
 }
 
-func (r *route) GET(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodGet, path, handlers...)
+func (r *router) DELETE(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodDelete, path, handlers...)
 }
 
-func (r *route) POST(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodPost, path, handlers...)
+func (r *router) HEAD(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodHead, path, handlers...)
 }
 
-func (r *route) PUT(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodPut, path, handlers...)
+func (r *router) PATCH(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodPatch, path, handlers...)
 }
 
-func (r *route) DELETE(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodDelete, path, handlers...)
+func (r *router) OPTIONS(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodOptions, path, handlers...)
 }
 
-func (r *route) HEAD(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodHead, path, handlers...)
+func (r *router) TRACE(path string, handlers ...HandlerFunc) Router {
+	return r.Handle(http.MethodTrace, path, handlers...)
 }
 
-func (r *route) PATCH(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodPatch, path, handlers...)
-}
-
-func (r *route) OPTIONS(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodOptions, path, handlers...)
-}
-
-func (r *route) TRACE(path string, handlers ...HandlerFunc) Router {
-	return r.add(http.MethodTrace, path, handlers...)
-}
-
-func (r *route) Any(path string, handlers ...HandlerFunc) Router {
+func (r *router) Any(path string, handlers ...HandlerFunc) Router {
 	for _, method := range anyMethods {
-		r.add(method, path, handlers...)
+		r.Handle(method, path, handlers...)
 	}
 	return r
 }
 
-func (r *route) Handle(method string, path string, handlers ...HandlerFunc) Router {
+func (r *router) Handle(method string, path string, handlers ...HandlerFunc) Router {
+	path = joinPath(r.basePath, path)
 	return r.add(method, path, handlers...)
 }
 
-func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
+func (r *router) Group(relativePath string, handlers ...HandlerFunc) Router {
 	return &Group{
 		basePath: joinPath(r.basePath, relativePath),
 		route:    r,
@@ -118,12 +93,44 @@ func (r *route) Group(relativePath string, handlers ...HandlerFunc) *Group {
 	}
 }
 
-func (r *route) Use(middlewares ...HandlerFunc) {
+func (r *router) Static(relativePath, root string) Router {
+	return r.StaticFS(relativePath, http.Dir(root))
+}
+
+func (r *router) StaticFS(relativePath string, fsys http.FileSystem) Router {
+	prefix := joinPath(r.basePath, relativePath)
+	fileServer := http.StripPrefix(prefix, http.FileServer(fsys))
+	handlerFunc := func(c *Ctx) error {
+		// filepath := c.Param("filepath")
+		fileServer.ServeHTTP(c.Response, c.Request)
+		return nil
+	}
+	return r.GET(path.Join(relativePath, "/*filepath"), handlerFunc)
+}
+
+func (r *router) StaticFile(relativePath, filePath string) Router {
+	handlerFunc := func(c *Ctx) error {
+		http.ServeFile(c.Response, c.Request, filePath)
+		return nil
+	}
+	return r.GET(relativePath, handlerFunc)
+}
+
+func (r *router) Use(middlewares ...HandlerFunc) {
 	r.handlers = append(r.handlers, middlewares...)
 	r.rebuild404Handlers()
 }
 
-func (r *route) add(method, path string, handlers ...HandlerFunc) Router {
+func (r *router) noRoute(handlers ...HandlerFunc) {
+	r.noRouteHandlers = handlers
+	r.rebuild404Handlers()
+}
+
+func (r *router) rebuild404Handlers() {
+	r.allNoRouteHandlers = combineHandlers(r.handlers, r.noRouteHandlers)
+}
+
+func (r *router) add(method, path string, handlers ...HandlerFunc) Router {
 	varsCount := uint16(0)
 
 	if method == "" {
@@ -163,13 +170,13 @@ func (r *route) add(method, path string, handlers ...HandlerFunc) Router {
 	return nil
 }
 
-func (r *route) getParams() *Params {
+func (r *router) getParams() *Params {
 	ps, _ := r.paramsPool.Get().(*Params)
 	*ps = (*ps)[0:0] // reset slice
 	return ps
 }
 
-func (r *route) putParams(ps *Params) {
+func (r *router) putParams(ps *Params) {
 	if ps != nil {
 		r.paramsPool.Put(ps)
 	}
