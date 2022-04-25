@@ -5,14 +5,12 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"sync"
 )
 
 type App struct {
 	server *http.Server
 	route  *router
 	Router
-	pool         sync.Pool
 	errorHandler ErrorHandler
 	binder       *binder
 	isDebug      bool
@@ -22,14 +20,16 @@ type App struct {
 func New() *App {
 	r := newRouter()
 	a := &App{
-		route:        r,
-		Router:       r,
+		route: r,
+		Router: &Group{
+			basePath: r.basePath,
+			route:    r,
+			isRoot:   true,
+		},
 		errorHandler: defaultErrorHandler,
 		binder:       &binder{},
 	}
-	a.pool.New = func() interface{} {
-		return &Ctx{app: a}
-	}
+	r.app = a
 	return a
 }
 
@@ -41,12 +41,8 @@ type Renderer interface {
 	Render(io.Writer, string, interface{}) error
 }
 
-func (a *App) Use(middlewares ...HandlerFunc) {
-	a.Router.Use(middlewares...)
-}
-
 func (a *App) Handler() http.Handler {
-	return a
+	return a.route
 }
 
 func (a *App) Validator(fc Validate, trans ...ValidateTranslate) {
@@ -91,48 +87,6 @@ func (a *App) Debug(isDebug bool) {
 
 func (a *App) Listener(listener net.Listener) error {
 	return http.Serve(listener, a.Handler())
-}
-
-func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := a.pool.Get().(*Ctx)
-	ctx.reset()
-	ctx.Request = req
-	ctx.writer = newResponseWriter(w)
-	ctx.Response = ctx.writer
-	defer a.pool.Put(ctx)
-
-	path := req.URL.Path
-	if root := a.route.trees[req.Method]; root != nil {
-		if value := root.getValue(path, a.route.getParams); value.handlers != nil {
-			ctx.path = path
-			ctx.handlers = value.handlers
-			ctx.routePath = value.fullPath
-			var err error
-			if value.params != nil {
-				ctx.Params = *value.params
-				err = ctx.Next()
-				a.route.putParams(value.params)
-			} else {
-				err = ctx.Next()
-			}
-			if err != nil {
-				ctx.HandleError(err)
-			}
-			return
-		}
-	}
-	ctx.handlers = a.route.allNoRouteHandlers
-	serveError(ctx, http.StatusNotFound, default404Body)
-}
-
-func serveError(c *Ctx, code int, defaultMessage []byte) {
-	c.writer.status = code
-	_ = c.Next() //middlewares
-	if c.Response.Committed() {
-		return
-	}
-	c.Status(code)
-	_, _ = c.Response.Write(defaultMessage)
 }
 
 func (app *App) NoRoute(handlers ...HandlerFunc) {

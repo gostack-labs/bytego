@@ -2,79 +2,101 @@ package bytego
 
 import (
 	"net/http"
+	"path"
 )
 
 type Group struct {
 	basePath string
-	route    Router
+	route    *router
 	handlers []HandlerFunc
+	isRoot   bool
+}
+
+func (g *Group) GET(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodGet, path, handlers...)
+}
+
+func (g *Group) POST(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodPost, path, handlers...)
+}
+
+func (g *Group) PUT(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodPut, path, handlers...)
+}
+
+func (g *Group) DELETE(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodDelete, path, handlers...)
+}
+
+func (g *Group) HEAD(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodHead, path, handlers...)
+}
+
+func (g *Group) PATCH(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodPatch, path, handlers...)
+}
+
+func (g *Group) OPTIONS(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodOptions, path, handlers...)
+}
+
+func (g *Group) TRACE(path string, handlers ...HandlerFunc) Router {
+	return g.Handle(http.MethodTrace, path, handlers...)
+}
+
+func (g *Group) Any(path string, handlers ...HandlerFunc) Router {
+	for _, method := range anyMethods {
+		g.Handle(method, path, handlers...)
+	}
+	return g.router()
+}
+
+func (g *Group) Handle(method string, path string, handlers ...HandlerFunc) Router {
+	path = joinPath(g.basePath, path)
+	handlers = combineHandlers(g.handlers, handlers)
+	g.route.add(method, path, handlers...)
+	return g.router()
 }
 
 func (g *Group) Group(relativePath string, handlers ...HandlerFunc) Router {
 	return &Group{
 		basePath: joinPath(g.basePath, relativePath),
 		route:    g.route,
+		handlers: combineHandlers(g.handlers, handlers),
 	}
 }
 
-func (g *Group) GET(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodGet, relativePath, handlers...)
+func (g *Group) Static(relativePath, root string) Router {
+	return g.StaticFS(relativePath, http.Dir(root))
 }
 
-func (g *Group) POST(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodPost, relativePath, handlers...)
-}
-
-func (g *Group) PUT(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodPut, relativePath, handlers...)
-}
-
-func (g *Group) DELETE(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodDelete, relativePath, handlers...)
-}
-
-func (g *Group) HEAD(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodHead, relativePath, handlers...)
-}
-
-func (g *Group) PATCH(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodPatch, relativePath, handlers...)
-}
-
-func (g *Group) OPTIONS(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodOptions, relativePath, handlers...)
-}
-func (g *Group) TRACE(relativePath string, handlers ...HandlerFunc) Router {
-	return g.Handle(http.MethodTrace, relativePath, handlers...)
-}
-
-func (g *Group) Any(relativePath string, handlers ...HandlerFunc) Router {
-	for _, method := range anyMethods {
-		g.Handle(method, relativePath, handlers...)
+func (g *Group) StaticFS(relativePath string, fsys http.FileSystem) Router {
+	prefix := joinPath(g.basePath, relativePath)
+	fileServer := http.StripPrefix(prefix, http.FileServer(fsys))
+	handlerFunc := func(c *Ctx) error {
+		// filepath := c.Param("filepath")
+		fileServer.ServeHTTP(c.Response, c.Request)
+		return nil
 	}
-	return g.route
+	return g.GET(path.Join(relativePath, "/*filepath"), handlerFunc)
+}
+
+func (g *Group) StaticFile(relativePath, filePath string) Router {
+	handlerFunc := func(c *Ctx) error {
+		http.ServeFile(c.Response, c.Request, filePath)
+		return nil
+	}
+	return g.GET(relativePath, handlerFunc)
 }
 
 func (g *Group) Use(middlewares ...HandlerFunc) {
 	g.handlers = append(g.handlers, middlewares...)
+	g.route.rebuild404Handlers()
 }
 
-func (g *Group) Handle(method string, relativePath string, handlers ...HandlerFunc) Router {
-	path := joinPath(g.basePath, relativePath)
-	return g.route.Handle(method, path, handlers...)
-}
-
-func (g *Group) Static(relativePath, root string) Router {
-	path := joinPath(g.basePath, relativePath)
-	return g.route.StaticFS(path, http.Dir(root))
-}
-
-func (g *Group) StaticFS(relativePath string, fsys http.FileSystem) Router {
-	path := joinPath(g.basePath, relativePath)
-	return g.route.StaticFS(path, fsys)
-}
-
-func (g *Group) StaticFile(relativePath, filepath string) Router {
-	path := joinPath(g.basePath, relativePath)
-	return g.route.StaticFile(path, filepath)
+func (g *Group) router() Router {
+	if g.isRoot {
+		return g.route.app
+	}
+	return g
 }

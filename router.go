@@ -2,7 +2,6 @@ package bytego
 
 import (
 	"net/http"
-	"path"
 	"sync"
 )
 
@@ -28,6 +27,9 @@ func newRouter() *router {
 	r := &router{
 		basePath: "/",
 	}
+	r.pool.New = func() interface{} {
+		return &Ctx{app: r.app}
+	}
 	return r
 }
 
@@ -39,86 +41,8 @@ type router struct {
 	handlers           []HandlerFunc
 	noRouteHandlers    []HandlerFunc
 	allNoRouteHandlers []HandlerFunc
-}
-
-func (r *router) GET(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodGet, path, handlers...)
-}
-
-func (r *router) POST(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodPost, path, handlers...)
-}
-
-func (r *router) PUT(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodPut, path, handlers...)
-}
-
-func (r *router) DELETE(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodDelete, path, handlers...)
-}
-
-func (r *router) HEAD(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodHead, path, handlers...)
-}
-
-func (r *router) PATCH(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodPatch, path, handlers...)
-}
-
-func (r *router) OPTIONS(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodOptions, path, handlers...)
-}
-
-func (r *router) TRACE(path string, handlers ...HandlerFunc) Router {
-	return r.Handle(http.MethodTrace, path, handlers...)
-}
-
-func (r *router) Any(path string, handlers ...HandlerFunc) Router {
-	for _, method := range anyMethods {
-		r.Handle(method, path, handlers...)
-	}
-	return r
-}
-
-func (r *router) Handle(method string, path string, handlers ...HandlerFunc) Router {
-	path = joinPath(r.basePath, path)
-	return r.add(method, path, handlers...)
-}
-
-func (r *router) Group(relativePath string, handlers ...HandlerFunc) Router {
-	return &Group{
-		basePath: joinPath(r.basePath, relativePath),
-		route:    r,
-		handlers: combineHandlers(r.handlers, handlers),
-	}
-}
-
-func (r *router) Static(relativePath, root string) Router {
-	return r.StaticFS(relativePath, http.Dir(root))
-}
-
-func (r *router) StaticFS(relativePath string, fsys http.FileSystem) Router {
-	prefix := joinPath(r.basePath, relativePath)
-	fileServer := http.StripPrefix(prefix, http.FileServer(fsys))
-	handlerFunc := func(c *Ctx) error {
-		// filepath := c.Param("filepath")
-		fileServer.ServeHTTP(c.Response, c.Request)
-		return nil
-	}
-	return r.GET(path.Join(relativePath, "/*filepath"), handlerFunc)
-}
-
-func (r *router) StaticFile(relativePath, filePath string) Router {
-	handlerFunc := func(c *Ctx) error {
-		http.ServeFile(c.Response, c.Request, filePath)
-		return nil
-	}
-	return r.GET(relativePath, handlerFunc)
-}
-
-func (r *router) Use(middlewares ...HandlerFunc) {
-	r.handlers = append(r.handlers, middlewares...)
-	r.rebuild404Handlers()
+	app                *App
+	pool               sync.Pool
 }
 
 func (r *router) noRoute(handlers ...HandlerFunc) {
@@ -128,6 +52,48 @@ func (r *router) noRoute(handlers ...HandlerFunc) {
 
 func (r *router) rebuild404Handlers() {
 	r.allNoRouteHandlers = combineHandlers(r.handlers, r.noRouteHandlers)
+}
+
+func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := r.pool.Get().(*Ctx)
+	ctx.reset()
+	ctx.Request = req
+	ctx.writer = newResponseWriter(w)
+	ctx.Response = ctx.writer
+	defer r.pool.Put(ctx)
+
+	path := req.URL.Path
+	if root := r.trees[req.Method]; root != nil {
+		if value := root.getValue(path, r.getParams); value.handlers != nil {
+			ctx.path = path
+			ctx.handlers = value.handlers
+			ctx.routePath = value.fullPath
+			var err error
+			if value.params != nil {
+				ctx.Params = *value.params
+				err = ctx.Next()
+				r.putParams(value.params)
+			} else {
+				err = ctx.Next()
+			}
+			if err != nil {
+				ctx.HandleError(err)
+			}
+			return
+		}
+	}
+	ctx.handlers = r.allNoRouteHandlers
+	r.serveError(ctx, http.StatusNotFound, default404Body)
+}
+
+func (r *router) serveError(c *Ctx, code int, defaultMessage []byte) {
+	c.writer.status = code
+	_ = c.Next() //middlewares
+	if c.Response.Committed() {
+		return
+	}
+	c.Status(code)
+	_, _ = c.Response.Write(defaultMessage)
 }
 
 func (r *router) add(method, path string, handlers ...HandlerFunc) Router {
@@ -180,12 +146,4 @@ func (r *router) putParams(ps *Params) {
 	if ps != nil {
 		r.paramsPool.Put(ps)
 	}
-}
-
-func combineHandlers(handlers1, handlers2 []HandlerFunc) []HandlerFunc {
-	size := len(handlers1) + len(handlers2)
-	mergedHandlers := make([]HandlerFunc, size)
-	copy(mergedHandlers, handlers1)
-	copy(mergedHandlers[len(handlers1):], handlers2)
-	return mergedHandlers
 }
