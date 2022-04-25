@@ -1,7 +1,6 @@
 package bytego
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 )
@@ -68,7 +67,6 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if value := root.getValue(path, r.getParams); value.handlers != nil {
 			ctx.path = path
 			ctx.handlers = value.handlers
-			fmt.Println(value.fullPath)
 			ctx.routePath = value.fullPath
 			var err error
 			if value.params != nil {

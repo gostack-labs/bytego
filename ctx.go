@@ -42,6 +42,10 @@ func (c *Ctx) reset() {
 	c.m = nil
 }
 
+func (c *Ctx) Header(key string) string {
+	return c.Request.Header.Get(key)
+}
+
 func (c *Ctx) Param(key string) string {
 	param, _ := c.Params.Get(key)
 	return param
@@ -67,16 +71,12 @@ func (c *Ctx) RoutePath() string {
 	return c.routePath
 }
 
-func (c *Ctx) Header(key, value string) {
+func (c *Ctx) SetHeader(key, value string) {
 	if value == "" {
 		c.Response.Header().Del(key)
 		return
 	}
 	c.Response.Header().Set(key, value)
-}
-
-func (c *Ctx) GetHeader(key string) string {
-	return c.Request.Header.Get(key)
 }
 
 func (c *Ctx) AppendHeader(key string, values ...string) {
@@ -94,7 +94,7 @@ func (c *Ctx) AppendHeader(key string, values ...string) {
 		}
 	}
 	if originalH != h {
-		c.Header(key, h)
+		c.SetHeader(key, h)
 	}
 }
 
@@ -279,6 +279,10 @@ func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {
 	if headers := header["Content-Type"]; len(headers) == 0 {
 		header["Content-Type"] = []string{contentType}
 	}
+}
+
+func (c *Ctx) Logger() Logger {
+	return c.app.Logger
 }
 
 func (c *Ctx) Context() context.Context {

@@ -30,7 +30,7 @@ func New(config ...Config) bytego.HandlerFunc {
 	maxAge := strconv.Itoa(cfg.MaxAge)
 
 	return func(c *bytego.Ctx) error {
-		origin := c.GetHeader(bytego.HeaderOrigin)
+		origin := c.Header(bytego.HeaderOrigin)
 		if len(origin) == 0 {
 			return nil
 		}
@@ -58,14 +58,14 @@ func New(config ...Config) bytego.HandlerFunc {
 
 		// Simple request
 		if c.Request.Method != http.MethodOptions {
-			c.Response.Header().Add(bytego.HeaderVary, bytego.HeaderOrigin)
-			c.Header(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
+			c.AppendHeader(bytego.HeaderVary, bytego.HeaderOrigin)
+			c.SetHeader(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
 
 			if cfg.AllowCredentials {
-				c.Header(bytego.HeaderAccessControlAllowCredentials, "true")
+				c.SetHeader(bytego.HeaderAccessControlAllowCredentials, "true")
 			}
 			if exposeHeaders != "" {
-				c.Header(bytego.HeaderAccessControlExposeHeaders, exposeHeaders)
+				c.SetHeader(bytego.HeaderAccessControlExposeHeaders, exposeHeaders)
 			}
 			return c.Next()
 		}
@@ -75,28 +75,27 @@ func New(config ...Config) bytego.HandlerFunc {
 		c.AppendHeader(bytego.HeaderVary, bytego.HeaderOrigin)
 		c.AppendHeader(bytego.HeaderVary, bytego.HeaderAccessControlRequestMethod)
 		c.AppendHeader(bytego.HeaderVary, bytego.HeaderAccessControlRequestHeaders)
-		c.AppendHeader(bytego.HeaderVary, "dddd")
-		c.Header(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
-		c.Header(bytego.HeaderAccessControlAllowMethods, allowMethods)
+		c.SetHeader(bytego.HeaderAccessControlAllowOrigin, allowOrigin)
+		c.SetHeader(bytego.HeaderAccessControlAllowMethods, allowMethods)
 
 		// Set Allow-Credentials if set to true
 		if cfg.AllowCredentials {
-			c.Header(bytego.HeaderAccessControlAllowCredentials, "true")
+			c.SetHeader(bytego.HeaderAccessControlAllowCredentials, "true")
 		}
 
 		// Set Allow-Headers if not empty
 		if allowHeaders != "" {
-			c.Header(bytego.HeaderAccessControlAllowHeaders, allowHeaders)
+			c.SetHeader(bytego.HeaderAccessControlAllowHeaders, allowHeaders)
 		} else {
-			h := c.GetHeader(bytego.HeaderAccessControlRequestHeaders)
+			h := c.Header(bytego.HeaderAccessControlRequestHeaders)
 			if h != "" {
-				c.Header(bytego.HeaderAccessControlAllowHeaders, h)
+				c.SetHeader(bytego.HeaderAccessControlAllowHeaders, h)
 			}
 		}
 
 		// Set MaxAge
 		if cfg.MaxAge > 0 {
-			c.Header(bytego.HeaderAccessControlMaxAge, maxAge)
+			c.SetHeader(bytego.HeaderAccessControlMaxAge, maxAge)
 		}
 		c.AbortWithStatus(http.StatusNoContent)
 		return nil

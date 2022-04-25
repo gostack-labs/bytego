@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 )
 
 type App struct {
@@ -15,6 +16,7 @@ type App struct {
 	binder       *binder
 	isDebug      bool
 	render       Renderer
+	Logger       Logger
 }
 
 func New() *App {
@@ -28,6 +30,7 @@ func New() *App {
 		},
 		errorHandler: defaultErrorHandler,
 		binder:       &binder{},
+		Logger:       NewLogger(os.Stdout),
 	}
 	r.app = a
 	return a
@@ -45,7 +48,7 @@ func (a *App) Handler() http.Handler {
 	return a.route
 }
 
-func (a *App) Validator(fc Validate, trans ...ValidateTranslate) {
+func (a *App) SetValidator(fc Validate, trans ...ValidateTranslate) {
 	if fc == nil {
 		return
 	}
@@ -55,18 +58,25 @@ func (a *App) Validator(fc Validate, trans ...ValidateTranslate) {
 	}
 }
 
-func (a *App) ErrorHandler(fc ErrorHandler) {
+func (a *App) SetErrorHandler(fc ErrorHandler) {
 	if fc == nil {
 		return
 	}
 	a.errorHandler = fc
 }
 
-func (a *App) Render(render Renderer) {
+func (a *App) SetRender(render Renderer) {
 	if render == nil {
 		return
 	}
 	a.render = render
+}
+
+func (a *App) SetLogger(l Logger) {
+	if l == nil {
+		return
+	}
+	a.Logger = l
 }
 
 func (a *App) Run(addr string) error {

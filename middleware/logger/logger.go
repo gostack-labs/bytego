@@ -56,7 +56,7 @@ func New(config ...Config) bytego.HandlerFunc {
 			case "pid":
 				return buf.WriteString(strconv.Itoa(pid))
 			case "request_id":
-				id := c.GetHeader(bytego.HeaderXRequestID)
+				id := c.Header(bytego.HeaderXRequestID)
 				if id == "" {
 					id = c.Response.Header().Get(bytego.HeaderXRequestID)
 				}
@@ -96,7 +96,7 @@ func New(config ...Config) bytego.HandlerFunc {
 			case "latency_human":
 				return buf.WriteString(stop.Sub(start).String())
 			case "bytes_in":
-				cl := c.GetHeader(bytego.HeaderContentLength)
+				cl := c.Header(bytego.HeaderContentLength)
 				if cl == "" {
 					cl = "0"
 				}
@@ -106,7 +106,7 @@ func New(config ...Config) bytego.HandlerFunc {
 			default:
 				switch {
 				case strings.HasPrefix(tag, "header:"):
-					return buf.Write([]byte(c.GetHeader(tag[7:])))
+					return buf.Write([]byte(c.Header(tag[7:])))
 				case strings.HasPrefix(tag, "query:"):
 					return buf.Write([]byte(c.Query(tag[6:])))
 				case strings.HasPrefix(tag, "form:"):
