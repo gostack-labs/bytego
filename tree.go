@@ -458,6 +458,7 @@ walk: // Outer loop for walking the tree
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
 			if value.handlers = n.handlers; value.handlers != nil {
+				value.fullPath = n.fullPath
 				return
 			}
 

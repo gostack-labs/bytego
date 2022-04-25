@@ -38,6 +38,7 @@ func (c *Ctx) reset() {
 	c.Response = nil
 	c.Request = nil
 	c.errorHandled = false
+	c.routePath = ""
 	c.m = nil
 }
 
