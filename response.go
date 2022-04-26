@@ -2,7 +2,6 @@ package bytego
 
 import (
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -14,13 +13,14 @@ type ResponseWriter interface {
 	Committed() bool
 }
 
-func newResponseWriter(w http.ResponseWriter) *responseWriter {
+func newResponseWriter(w http.ResponseWriter, app *App) *responseWriter {
 	return &responseWriter{
 		ResponseWriter: w,
 	}
 }
 
 type responseWriter struct {
+	app *App
 	http.ResponseWriter
 	size      int
 	status    int
@@ -36,7 +36,7 @@ func (w *responseWriter) Write(data []byte) (n int, err error) {
 
 func (w *responseWriter) WriteHeader(code int) {
 	if w.committed {
-		log.Println("writer already commited!")
+		w.app.Logger.Warn("writer already commited!")
 		return
 	}
 	w.status = code

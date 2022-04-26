@@ -58,7 +58,7 @@ func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := r.pool.Get().(*Ctx)
 	ctx.reset()
 	ctx.Request = req
-	ctx.writer = newResponseWriter(w)
+	ctx.writer = newResponseWriter(w, r.app)
 	ctx.Response = ctx.writer
 	defer r.pool.Put(ctx)
 
