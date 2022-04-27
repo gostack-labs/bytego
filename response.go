@@ -16,6 +16,7 @@ type ResponseWriter interface {
 func newResponseWriter(w http.ResponseWriter, app *App) *responseWriter {
 	return &responseWriter{
 		ResponseWriter: w,
+		app:            app,
 	}
 }
 
@@ -36,7 +37,9 @@ func (w *responseWriter) Write(data []byte) (n int, err error) {
 
 func (w *responseWriter) WriteHeader(code int) {
 	if w.committed {
-		w.app.Logger.Warn("writer already commited!")
+		if code != w.status {
+			w.app.Logger.Warn("writer already commited!")
+		}
 		return
 	}
 	w.status = code
