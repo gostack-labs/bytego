@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"strings"
 	"sync"
 )
@@ -76,7 +75,6 @@ func NewLogger(w io.Writer, level ...string) Logger {
 	if len(level) > 0 {
 		logLevel = ParseLogLevel(level[0])
 	}
-	fmt.Println(w == os.Stdout || w == os.Stderr)
 	var l Logger = &defaultLogger{
 		level: logLevel,
 		log:   log.New(w, "", log.LstdFlags),
