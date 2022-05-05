@@ -16,11 +16,7 @@ const (
 	LEVEL_ERROR
 )
 
-type LogLevel int
-
-func (l LogLevel) Int() int {
-	return int(l)
-}
+type LogLevel int8
 
 func (l LogLevel) String() string {
 	switch l {
@@ -33,7 +29,7 @@ func (l LogLevel) String() string {
 	case LEVEL_ERROR:
 		return "ERROR"
 	default:
-		return ""
+		return "INFO"
 	}
 }
 
