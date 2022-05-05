@@ -14,7 +14,6 @@ const (
 	LEVEL_INFO
 	LEVEL_WARN
 	LEVEL_ERROR
-	LEVEL_OFF
 )
 
 type LogLevel int
@@ -33,8 +32,6 @@ func (l LogLevel) String() string {
 		return "WARN"
 	case LEVEL_ERROR:
 		return "ERROR"
-	case LEVEL_OFF:
-		return "OFF"
 	default:
 		return ""
 	}
@@ -50,8 +47,6 @@ func ParseLogLevel(s string) LogLevel {
 		return LEVEL_WARN
 	case "ERROR":
 		return LEVEL_ERROR
-	case "OFF":
-		return LEVEL_OFF
 	}
 	return LEVEL_INFO
 }
