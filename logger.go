@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	LEVEL_DEBUG LogLevel = iota + 1
+	LEVEL_DEBUG LogLevel = iota - 1
 	LEVEL_INFO
 	LEVEL_WARN
 	LEVEL_ERROR
