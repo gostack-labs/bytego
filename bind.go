@@ -114,57 +114,61 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 					ptr := reflect.New(filedVal.Type().Elem())
 					filedVal.Set(ptr)
 				}
+				if err := b.bindData(filedVal.Interface(), data, tag, ""); err != nil {
+					return err
+				}
 			} else if filedVal.Kind() == reflect.Struct {
 				if err := b.bindData(filedVal.Addr().Interface(), data, tag, ""); err != nil {
 					return err
 				}
 			}
+			continue
 		}
 		if !filedVal.CanSet() {
 			continue
 		}
 		tagValue, ok := field.Tag.Lookup(tag)
-		if !ok {
+		tagName := b.getTag(tagValue) //header,param,query,param
+		if tagName == "-" {
 			continue
 		}
-		tagName := b.getTag(tagValue) //header,param,query,param
-		if tagName == "" || tagName == "-" {
-			continue
+		var fullTagName string
+		if tagName == "" {
+			fullTagName = field.Name
+		} else {
+			fullTagName = tagName
 		}
 		if parentTagValue != "" {
-			tagName = parentTagValue + "." + tagName
-		}
-		val, exists := data[tagName]
-		if !exists {
-			for k, v := range data {
-				if strings.EqualFold(k, tagName) { //ignore case
-					exists = true
-					val = v
-				}
-			}
+			fullTagName = parentTagValue + "." + fullTagName
 		}
 
 		switch filedVal.Kind() {
 		case reflect.Struct:
-			if err := b.bindData(filedVal.Addr().Interface(), data, tag, tagName); err != nil {
+			if err := b.bindData(filedVal.Addr().Interface(), data, tag, fullTagName); err != nil {
 				return err
 			}
+			continue
 		case reflect.Ptr:
-			if filedVal.IsNil() && tagName != "" {
+			if filedVal.IsNil() && fullTagName != "" {
 				for k := range data {
-					if strings.HasPrefix(strings.ToLower(k), strings.ToLower(tagName+".")) {
+					if strings.HasPrefix(strings.ToLower(k), strings.ToLower(fullTagName+".")) {
 						ptr := reflect.New(filedVal.Type().Elem())
 						filedVal.Set(ptr)
-						continue
+						break
 					}
 				}
 			}
 			if !filedVal.IsNil() {
-				if err := b.bindData(filedVal.Interface(), data, tag, tagName); err != nil {
+				if err := b.bindData(filedVal.Interface(), data, tag, fullTagName); err != nil {
 					return err
 				}
 			}
+			continue
 		case reflect.Slice:
+			val, exists := b.findIgnoreCaseData(data, fullTagName)
+			if !exists || len(val) == 0 {
+				continue
+			}
 			slice := reflect.MakeSlice(filedVal.Type(), len(val), len(val))
 			for i, v := range val {
 				if err := b.setField(slice.Index(i), field, v); err != nil {
@@ -172,9 +176,14 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 				}
 			}
 			filedVal.Set(slice)
+			continue
 		}
 
-		if !exists {
+		if !ok {
+			continue
+		}
+		val, exists := b.findIgnoreCaseData(data, fullTagName)
+		if !exists || len(val) == 0 {
 			continue
 		}
 		err := b.setField(filedVal, field, val[0])
@@ -183,6 +192,20 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 		}
 	}
 	return nil
+}
+
+func (b *binder) findIgnoreCaseData(data map[string][]string, key string) (val []string, exists bool) {
+	val, exists = data[key]
+	if !exists {
+		for k, v := range data {
+			if strings.EqualFold(k, key) { //ignore case
+				exists = true
+				val = v
+				return
+			}
+		}
+	}
+	return
 }
 
 func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
