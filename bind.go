@@ -27,6 +27,9 @@ type binder struct {
 }
 
 func (b *binder) Bind(c *Ctx, i interface{}) error {
+	if err := b.bindDefault(i, "default"); err != nil {
+		return err
+	}
 	if err := b.bindParams(c, i); err != nil {
 		return err
 	}
@@ -80,7 +83,7 @@ func (b *binder) bindBody(c *Ctx, i interface{}) error {
 		if err := c.Request.ParseForm(); err != nil {
 			return err
 		}
-		return b.bindData(i, c.Request.Form, "form", "")
+		return b.bindData(i, c.Request.PostForm, "form", "")
 	}
 	return nil
 }
@@ -103,25 +106,30 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 
 	//struct
 	for i := 0; i < dtype.NumField(); i++ {
-		filed := dtype.Field(i)
+		field := dtype.Field(i)
 		filedVal := dval.Field(i)
-		if filed.Anonymous {
+		if field.Anonymous {
 			if filedVal.Kind() == reflect.Ptr {
 				if filedVal.IsNil() {
 					ptr := reflect.New(filedVal.Type().Elem())
 					filedVal.Set(ptr)
+				}
+			} else if filedVal.Kind() == reflect.Struct {
+				if err := b.bindData(filedVal.Addr().Interface(), data, tag, ""); err != nil {
+					return err
 				}
 			}
 		}
 		if !filedVal.CanSet() {
 			continue
 		}
-		tagName := b.getTag(filed.Tag.Get(tag))
-		if tagName == "-" {
+		tagValue, ok := field.Tag.Lookup(tag)
+		if !ok {
 			continue
 		}
-		if tagName == "" && !filed.Anonymous {
-			tagName = filed.Name
+		tagName := b.getTag(tagValue) //header,param,query,param
+		if tagName == "" || tagName == "-" {
+			continue
 		}
 		if parentTagValue != "" {
 			tagName = parentTagValue + "." + tagName
@@ -129,7 +137,7 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 		val, exists := data[tagName]
 		if !exists {
 			for k, v := range data {
-				if strings.EqualFold(k, tagName) {
+				if strings.EqualFold(k, tagName) { //ignore case
 					exists = true
 					val = v
 				}
@@ -142,7 +150,7 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 				return err
 			}
 		case reflect.Ptr:
-			if !filed.Anonymous && filedVal.IsNil() && tagName != "" {
+			if filedVal.IsNil() && tagName != "" {
 				for k := range data {
 					if strings.HasPrefix(strings.ToLower(k), strings.ToLower(tagName+".")) {
 						ptr := reflect.New(filedVal.Type().Elem())
@@ -159,7 +167,7 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 		case reflect.Slice:
 			slice := reflect.MakeSlice(filedVal.Type(), len(val), len(val))
 			for i, v := range val {
-				if err := b.setField(slice.Index(i), filed, v); err != nil {
+				if err := b.setField(slice.Index(i), field, v); err != nil {
 					return err
 				}
 			}
@@ -169,7 +177,96 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 		if !exists {
 			continue
 		}
-		err := b.setField(filedVal, filed, val[0])
+		err := b.setField(filedVal, field, val[0])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
+	if dest == nil || len(defaultTagName) == 0 {
+		return nil
+	}
+	dtype := reflect.TypeOf(dest).Elem()
+	dval := reflect.ValueOf(dest).Elem()
+	if dtype.Kind() != reflect.Struct {
+		return nil
+	}
+
+	//struct
+	for i := 0; i < dtype.NumField(); i++ {
+		field := dtype.Field(i)
+		filedVal := dval.Field(i)
+		if field.Anonymous { //embedded
+			if filedVal.Kind() == reflect.Ptr {
+				if filedVal.IsNil() {
+					ptr := reflect.New(filedVal.Type().Elem())
+					filedVal.Set(ptr)
+				}
+				if err := b.bindDefault(filedVal.Interface(), defaultTagName); err != nil {
+					return err
+				}
+			}
+		}
+		if !filedVal.CanSet() {
+			continue
+		}
+
+		if filedVal.Kind() == reflect.Struct {
+			if err := b.bindDefault(filedVal.Addr().Interface(), defaultTagName); err != nil {
+				return err
+			}
+			continue
+		}
+
+		val, ok := field.Tag.Lookup(defaultTagName)
+		defaultValue := b.getTag(val)
+
+		switch filedVal.Kind() {
+		case reflect.Struct:
+			if err := b.bindDefault(filedVal.Addr().Interface(), defaultTagName); err != nil {
+				return err
+			}
+			continue
+		case reflect.Ptr:
+			if filedVal.IsNil() && defaultValue != "" {
+				ptr := reflect.New(filedVal.Type().Elem())
+				filedVal.Set(ptr)
+			}
+			if !filedVal.IsNil() {
+				kind := filedVal.Type().Elem().Kind()
+				if kind == reflect.Struct {
+					if err := b.bindDefault(filedVal.Interface(), defaultTagName); err != nil {
+						return err
+					}
+				} else {
+					if err := b.setField(filedVal.Elem(), field, defaultValue); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+		case reflect.Slice:
+			if val != "" {
+				vals := strings.Split(val, ",")
+				if len(vals) > 0 {
+					slice := reflect.MakeSlice(filedVal.Type(), len(vals), len(vals))
+					for i, v := range vals {
+						if err := b.setField(slice.Index(i), field, strings.TrimSpace(v)); err != nil {
+							return err
+						}
+					}
+					filedVal.Set(slice)
+				}
+			}
+			continue
+		}
+		if !ok {
+			continue
+		}
+		err := b.setField(filedVal, field, defaultValue)
 		if err != nil {
 			return err
 		}
