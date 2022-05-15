@@ -194,20 +194,6 @@ func (b *binder) bindData(dest interface{}, data map[string][]string, tag string
 	return nil
 }
 
-func (b *binder) findIgnoreCaseData(data map[string][]string, key string) (val []string, exists bool) {
-	val, exists = data[key]
-	if !exists {
-		for k, v := range data {
-			if strings.EqualFold(k, key) { //ignore case
-				exists = true
-				val = v
-				return
-			}
-		}
-	}
-	return
-}
-
 func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
 	if dest == nil || len(defaultTagName) == 0 {
 		return nil
@@ -237,13 +223,6 @@ func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
 			continue
 		}
 
-		if filedVal.Kind() == reflect.Struct {
-			if err := b.bindDefault(filedVal.Addr().Interface(), defaultTagName); err != nil {
-				return err
-			}
-			continue
-		}
-
 		val, ok := field.Tag.Lookup(defaultTagName)
 		defaultValue := b.getTag(val)
 
@@ -269,8 +248,8 @@ func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
 						return err
 					}
 				}
-				continue
 			}
+			continue
 		case reflect.Slice:
 			if val != "" {
 				vals := strings.Split(val, ",")
@@ -295,6 +274,20 @@ func (b *binder) bindDefault(dest interface{}, defaultTagName string) error {
 		}
 	}
 	return nil
+}
+
+func (b *binder) findIgnoreCaseData(data map[string][]string, key string) (val []string, exists bool) {
+	val, exists = data[key]
+	if !exists {
+		for k, v := range data {
+			if strings.EqualFold(k, key) { //ignore case
+				exists = true
+				val = v
+				return
+			}
+		}
+	}
+	return
 }
 
 func (b *binder) getTag(tag string) string {
