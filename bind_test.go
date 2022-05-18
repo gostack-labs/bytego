@@ -53,7 +53,7 @@ func Test_binder_bindDefault(t *testing.T) {
 		if len(v.IntSlice) != 3 || v.IntSlice[0] != 100 || v.IntSlice[1] != 200 || v.IntSlice[2] != 300 {
 			t.Error("bind int slice error")
 		}
-		if len(v.StringSlice) != 4 || v.StringSlice[0] != "abc" || v.StringSlice[1] != "def" {
+		if len(v.StringSlice) != 4 || v.StringSlice[0] != "abc" || v.StringSlice[1] != "def" || v.StringSlice[2] != "ghi" || v.StringSlice[3] != "jk" {
 			t.Error("bind string slice error")
 		}
 	})

@@ -45,7 +45,7 @@ func (b *binder) Bind(c *Ctx, i interface{}) error {
 	if b.validate != nil {
 		err := b.validate(i)
 		if err != nil && b.validateTranslate != nil {
-			return b.validateTranslate(err)
+			return b.validateTranslate(c, err)
 		}
 		return err
 	}

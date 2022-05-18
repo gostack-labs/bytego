@@ -39,7 +39,7 @@ func New() *App {
 type HandlerFunc func(*Ctx) error
 type Map map[string]interface{}
 type Validate func(i interface{}) error
-type ValidateTranslate func(err error) error
+type ValidateTranslate func(c *Ctx, err error) error
 type Renderer interface {
 	Render(io.Writer, string, interface{}) error
 }
