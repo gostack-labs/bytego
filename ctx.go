@@ -109,7 +109,7 @@ func (c *Ctx) JSON(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Response, jsonContentType)
+	c.writeContentType(jsonContentType)
 	c.Status(code)
 	_, err = c.Response.Write(bs)
 	return err
@@ -124,7 +124,7 @@ func (c *Ctx) JSONP(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Response, jsonContentType)
+	c.writeContentType(jsonContentType)
 	c.Status(code)
 	if _, err = c.Response.Write(stringToBytes(callback)); err != nil {
 		return err
@@ -146,7 +146,7 @@ func (c *Ctx) XML(code int, i interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.writeContentType(c.Response, xmlContentType)
+	c.writeContentType(xmlContentType)
 	c.Status(code)
 	_, err = c.Response.Write(bs)
 	return err
@@ -157,10 +157,17 @@ func (c *Ctx) HTML(code int, html string) error {
 }
 
 func (c *Ctx) HTMLBlob(code int, b []byte) (err error) {
-	c.writeContentType(c.Response, htmlContentType)
+	c.writeContentType(htmlContentType)
 	c.Status(code)
 	_, err = c.Response.Write(b)
 	return err
+}
+
+func (c *Ctx) Blob(code int, contentType string, b []byte) (err error) {
+	c.writeContentType(contentType)
+	c.Status(code)
+	_, err = c.Response.Write(b)
+	return
 }
 
 func (c *Ctx) View(code int, name string, data interface{}) error {
@@ -274,8 +281,8 @@ func (c *Ctx) Bind(i interface{}) error {
 	return c.app.binder.Bind(c, i)
 }
 
-func (c *Ctx) writeContentType(w http.ResponseWriter, contentType string) {
-	header := w.Header()
+func (c *Ctx) writeContentType(contentType string) {
+	header := c.Response.Header()
 	if headers := header["Content-Type"]; len(headers) == 0 {
 		header["Content-Type"] = []string{contentType}
 	}
